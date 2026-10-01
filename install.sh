@@ -65,12 +65,14 @@ cp "$KIT/scripts/qa/deferred-plugins-wait.mjs" scripts/qa/deferred-plugins-wait.
 mkdir -p design
 cp "$KIT/scripts/upload-files.py" scripts/upload-files.py
 cp "$KIT/scripts/deploy.mjs" scripts/deploy.mjs
+cp "$KIT/scripts/theme-sync.mjs" scripts/theme-sync.mjs
 cp "$KIT/scripts/review-stamp.mjs" scripts/review-stamp.mjs
 cp "$KIT/scripts/kit-suggest.mjs" scripts/kit-suggest.mjs
 mkdir -p reviews
 cp "$KIT/tests/ship-gate.test.mjs" tests/ship-gate.test.mjs
 cp "$KIT/tests/seo-walk.test.mjs" tests/seo-walk.test.mjs
 cp "$KIT/tests/a11y-walk.test.mjs" tests/a11y-walk.test.mjs
+cp "$KIT/tests/theme-sync.test.mjs" tests/theme-sync.test.mjs
 [ -f design/seo-pages.json ] || cp "$KIT/seo-pages.json.example" design/seo-pages.json
 say "   DEVOTE-KIT.md, scripts/qa/ship-gate.mjs, scripts/qa/speed-walk.mjs, scripts/qa/seo-walk.mjs, scripts/upload-files.py, scripts/deploy.mjs, tests/ship-gate.test.mjs, tests/seo-walk.test.mjs, design/seo-pages.json (fill in the brand and one URL per page type)"
 
@@ -138,6 +140,8 @@ say "4b. Installing what the design walk needs (headless Chrome driver)"
 npm install --save-dev --no-audit --no-fund puppeteer-core@23 chrome-launcher@1 axe-core@4 >/dev/null 2>&1 \
   && say "   installed" || warn "   could not install; run: npm i -D puppeteer-core chrome-launcher axe-core"
 grep -q '^node_modules/' .gitignore 2>/dev/null || printf 'node_modules/\n/parity/\n.deploy.lock/\n' >> .gitignore
+grep -q '^.theme-incoming/' .gitignore 2>/dev/null || printf '.theme-incoming/\n' >> .gitignore
+grep -q '^.theme-incoming/' .shopifyignore 2>/dev/null || printf '.theme-incoming/\n' >> .shopifyignore
 grep -q '^design/' .shopifyignore 2>/dev/null || printf 'node_modules/\nparity/\ndesign/\nscripts/\n' >> .shopifyignore
 
 # -------------------------------------------------------------------- plugin

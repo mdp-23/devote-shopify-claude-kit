@@ -35,6 +35,24 @@ Do not delete rules because they look obvious. They all look obvious afterwards.
 
 If a task needs one of these, say so rather than finding a way around it.
 
+## Several people on one theme
+
+Deploy never pushes an old copy over someone else's work. Before pushing, it pulls the theme's
+code and compares each file with `.theme-baseline.json` (the theme as it was at this repo's last
+sync; commit it):
+
+- Someone else changed a file you did not touch: their version comes into the repo and nothing
+  is pushed. Review `git diff`, commit, deploy again.
+- You both changed the same file: their version goes in `.theme-incoming/` and nothing is pushed.
+  Merge it into yours (keep both changes), delete `.theme-incoming/`, deploy again. Deploy refuses
+  while that folder has anything in it.
+- The first deploy from a repo to a theme has no record to compare with. If nobody else has
+  pushed to that theme, `npm run deploy -- --first-sync`. If someone may have,
+  `npm run deploy -- --pull` first and read the diff.
+
+Two people deploying in the same few seconds can still race. Say in the team chat before a
+deploy when someone else is on the same theme.
+
 ## What every deploy runs
 
 `npm run deploy` refuses to push until the code review and security review are stamped (below)

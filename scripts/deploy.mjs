@@ -7,7 +7,8 @@
 //   npm run deploy                   # QA, push code, then SEO, accessibility and speed on the preview
 //   npm run deploy -- --skip-walks   # while iterating: no SEO or speed, and it says so (not for handover)
 //   npm run deploy -- --with-json    # also push your template/settings changes, only if safe
-//   npm run deploy -- --pull         # just bring editor changes into the repo
+//   npm run deploy -- --pull         # just bring editor changes and other people's code into the repo
+//   npm run deploy -- --first-sync   # first deploy from this repo to a theme, when nobody else has pushed to it
 //   npm run deploy -- --with-json --json templates/product.json,templates/collection.json
 //                                    # push only these editor files of yours (parallel page builds)
 // Runs one at a time: a second deploy waits for the first (lock in .deploy.lock), so two
@@ -28,6 +29,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { reviewStatus } from "./review-stamp.mjs";
+import { CODE_GLOBS, classify, codeFilesIn, hashFile } from "./theme-sync.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const arg = (name) => { const i = process.argv.indexOf(name); return i > -1 ? process.argv[i + 1] : null; };
@@ -42,6 +44,9 @@ const ONLY_JSON = arg("--json") ? arg("--json").split(",").map((f) => f.trim()).
 // myshopify.com address adds a redirect no visitor pays (see DEVOTE-KIT.md, speed).
 const DOMAIN = (arg("--domain") || process.env.SHOP_DOMAIN || "").replace(/^https?:\/\//, "").replace(/\/$/, "");
 const SKIP_WALKS = process.argv.includes("--skip-walks");
+const FIRST_SYNC = process.argv.includes("--first-sync");
+const CODE_BASELINE = join(ROOT, ".theme-baseline.json");
+const INCOMING = join(ROOT, ".theme-incoming");
 
 // one deploy at a time
 const LOCK = join(ROOT, ".deploy.lock");
@@ -90,6 +95,46 @@ function list(dir) {
   }
   return out.sort();
 }
+
+// 0. Code someone else pushed (scripts/theme-sync.mjs). Checked before anything else, so a deploy
+// never puts back an old copy of a file another person changed on the theme.
+if (existsSync(INCOMING) && readdirSync(INCOMING, { recursive: true }).length) {
+  console.log("Not deploying: .theme-incoming/ still holds other people's versions of files you also changed.");
+  console.log("Merge each one into the matching file in the repo, delete .theme-incoming/, then deploy again.");
+  process.exit(1);
+}
+const codeRemoteDir = mkdtempSync(join(tmpdir(), "code-pull-"));
+run(["theme", "pull", "--store", STORE, "--theme", THEME, "--path", codeRemoteDir, ...CODE_GLOBS.flatMap((g) => ["--only", g])]);
+const remoteCode = Object.fromEntries(codeFilesIn(codeRemoteDir).map((f) => [f, hashFile(join(codeRemoteDir, f))]));
+if (!Object.keys(remoteCode).length) { console.log("Pulled no code from the theme, so it is not known what others changed. Stopping."); process.exit(1); }
+const localCode = Object.fromEntries(codeFilesIn(ROOT).map((f) => [f, hashFile(join(ROOT, f))]));
+const allCodeBase = existsSync(CODE_BASELINE) ? JSON.parse(readFileSync(CODE_BASELINE, "utf8")) : {};
+const saveCodeBase = (b) => { allCodeBase[THEME] = b; writeFileSync(CODE_BASELINE, JSON.stringify(allCodeBase, null, 2) + "\n"); };
+const sync = classify(allCodeBase[THEME] || null, remoteCode, localCode);
+if (PULL_ONLY) { sync.take.push(...sync.unknown); sync.unknown = []; }
+if (sync.unknown.length && !FIRST_SYNC) {
+  console.log(`Not deploying: this is the first deploy from this repo to theme ${THEME}, and ${sync.unknown.length} code file(s) differ from what the theme holds:`);
+  for (const f of sync.unknown.slice(0, 25)) console.log(`  ${f}`);
+  if (sync.unknown.length > 25) console.log(`  and ${sync.unknown.length - 25} more`);
+  console.log("With no record of the last sync it cannot tell your changes from someone else's.");
+  console.log("If nobody else has pushed to this theme, these are yours: npm run deploy -- --first-sync");
+  console.log("If someone else may have, bring the theme's copies in first: npm run deploy -- --pull, then review git diff.");
+  process.exit(1);
+}
+if (sync.take.length || sync.clash.length) {
+  for (const f of sync.take) { mkdirSync(dirname(join(ROOT, f)), { recursive: true }); cpSync(join(codeRemoteDir, f), join(ROOT, f)); }
+  for (const f of sync.clash) { mkdirSync(dirname(join(INCOMING, f)), { recursive: true }); cpSync(join(codeRemoteDir, f), join(INCOMING, f)); }
+  const base = { ...(allCodeBase[THEME] || {}) };
+  for (const f of [...sync.take, ...sync.clash]) base[f] = remoteCode[f];
+  saveCodeBase(base);
+  if (sync.take.length) console.log(`Someone else changed these on the theme since your last sync. Brought into the repo:\n  ${sync.take.join("\n  ")}`);
+  if (sync.clash.length) console.log(`You and someone else both changed these. Their versions are in .theme-incoming/ to merge:\n  ${sync.clash.join("\n  ")}`);
+  if (!PULL_ONLY || sync.clash.length) {
+    console.log("\nNothing was pushed. Review with git diff" + (sync.clash.length ? ", merge .theme-incoming/ and delete it" : "") + ", commit, then deploy again.");
+    process.exit(1);
+  }
+}
+if (PULL_ONLY && !sync.take.length && !allCodeBase[THEME]) saveCodeBase(remoteCode);
 
 // 1. What does the theme hold right now?
 const remote = mkdtempSync(join(tmpdir(), "editor-pull-"));
@@ -150,6 +195,8 @@ for (const g of ["templates/*.json", "config/settings_data.json", "sections/*.js
 }
 pushChecked(["theme", "push", "--store", STORE, "--theme", THEME, "--nodelete"], { cwd: ROOT });
 console.log("Code pushed. Editor-owned files were not sent.");
+// The theme now holds this repo's code: that is the new last sync.
+saveCodeBase({ ...remoteCode, ...localCode });
 
 // 4. Optionally, your own editor-file changes, now that the theme is known to be untouched.
 if (WITH_JSON) {
