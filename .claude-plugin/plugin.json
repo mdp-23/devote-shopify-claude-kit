@@ -1,0 +1,7 @@
+{
+  "name": "devote-shopify",
+  "description": "Devote Digital's Shopify kit: safety gate, deploy, QA guards and shared rules, installed and kept up to date in every brand repo.",
+  "author": { "name": "Devote Digital", "url": "https://devotedigital.com.au" },
+  "homepage": "https://github.com/mdp-23/devote-shopify-claude-kit",
+  "keywords": ["shopify", "theme", "devote"]
+}

@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "enabledPlugins": {
+    "shopify-ai-toolkit@claude-plugins-official": true
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/qa/ship-gate.mjs",
+            "timeout": 120,
+            "statusMessage": "Ship gate: theme safety, QA, merge evidence"
+          },
+          {
+            "type": "agent",
+            "if": "Bash(git push:*)",
+            "model": "claude-opus-5",
+            "timeout": 420,
+            "statusMessage": "Pre-push review: standards + spec",
+            "prompt": "A git push is about to happen. Review the outgoing diff and BLOCK it if what is about to leave this machine would be a mistake.\n\nWork out the diff: `git log @{u}..HEAD --oneline` and `git diff @{u}...HEAD`. If there is no upstream, review `git diff origin/main...HEAD`. If the diff is empty, approve immediately with no other commentary.\n\nReview it on two axes, kept separate:\n\n1. STANDARDS. Read CLAUDE.md and DEVOTE-KIT.md for this repo's documented rules and check the diff against them. Pay particular attention to the standing ones: absent must never look like zero or failed (a missing metafield, an empty compare_at_price, a capped Liquid loop, an API call that returned nothing); money is never a float and a currency is never a hardcoded symbol; a bug fix sweeps the whole class rather than the one reported instance; every bug fix lands a guard under scripts/qa/ in the same commit; nothing that renders ships without an image width.\n\n2. SPEC. If a commit message references an issue (#123, Closes #45), fetch it with `gh issue view` and check the diff does what was asked, without unrequested scope creep.\n\nBLOCK only for things that should genuinely stop a push: a correctness regression, a fix that addresses one instance of a class the repo rule says to sweep, data presented as real when it could not be fetched, a spec requirement plainly unimplemented, a removed guard, or anything that would write to a live store. Do NOT block on style preferences, naming taste, or missing tests for unchanged code. A gate that fires on legitimate work gets turned off, and that is worse than no gate.\n\nWhen you block, quote the hunk and say what to do. When you approve, say in one line what is being pushed and what you checked."
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "deny": [
+      "Bash(shopify theme publish:*)",
+      "Bash(shopify theme delete:*)",
+      "Bash(shopify theme push:* --live*)",
+      "Bash(shopify theme push:* --allow-live*)"
+    ]
+  }
+}

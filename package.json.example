@@ -1,0 +1,19 @@
+{
+  "scripts": {
+    "qa": "npm run qa:static && npm run test",
+    "qa:static": "node scripts/qa/run-all.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "walk": "node scripts/qa/speed-walk.mjs",
+    "speed": "node scripts/qa/speed-walk.mjs",
+    "parity": "node scripts/qa/design-parity-walk.mjs",
+    "seo": "node scripts/qa/seo-walk.mjs",
+    "deploy": "node scripts/deploy.mjs --store FILL-IN.myshopify.com --theme FILL-IN-PREVIEW-THEME-ID --domain FILL-IN-www.store-domain.com.au",
+    "review:stamp": "node scripts/review-stamp.mjs",
+    "a11y": "node scripts/qa/a11y-walk.mjs"
+  },
+  "devDependencies": {
+    "puppeteer-core": "^23",
+    "chrome-launcher": "^1",
+    "axe-core": "^4"
+  }
+}

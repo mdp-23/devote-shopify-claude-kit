@@ -1,0 +1,7 @@
+#!/bin/sh
+# The kit is public: no commit may name a client. Runs the kit's tests (the client-name check
+# reads the uncommitted .client-names). Enabled with: git config core.hooksPath .githooks
+exec node --test tests/*.test.mjs >/dev/null 2>&1 || {
+  echo "Commit blocked: node --test tests/*.test.mjs fails. A client name or real store address is the usual cause; run it to see which."
+  exit 1
+}

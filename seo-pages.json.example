@@ -1,0 +1,12 @@
+{
+  "brand": "FILL-IN brand name as it appears in titles",
+  "pages": [
+    "/",
+    "/collections/all",
+    "/products/FILL-IN",
+    "/blogs/news",
+    "/blogs/news/FILL-IN",
+    "/pages/contact",
+    "/search?q=a"
+  ]
+}
