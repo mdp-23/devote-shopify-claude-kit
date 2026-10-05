@@ -137,9 +137,10 @@ fi
 
 # ------------------------------------------------------- walk dependencies
 say "4b. Installing what the design walk needs (headless Chrome driver)"
-npm install --save-dev --no-audit --no-fund puppeteer-core@23 chrome-launcher@1 axe-core@4 >/dev/null 2>&1 \
-  && say "   installed" || warn "   could not install; run: npm i -D puppeteer-core chrome-launcher axe-core"
+npm install --save-dev --no-audit --no-fund puppeteer-core@23 chrome-launcher@1 axe-core@4 pngjs@7 pixelmatch@7 >/dev/null 2>&1 \
+  && say "   installed" || warn "   could not install; run: npm i -D puppeteer-core chrome-launcher axe-core pngjs pixelmatch"
 grep -q '^node_modules/' .gitignore 2>/dev/null || printf 'node_modules/\n/parity/\n.deploy.lock/\n' >> .gitignore
+grep -q 'visual-baseline' .gitignore 2>/dev/null || printf '/design/visual-baseline/\n' >> .gitignore
 grep -q '^.theme-incoming/' .gitignore 2>/dev/null || printf '.theme-incoming/\n' >> .gitignore
 grep -q '^.theme-incoming/' .shopifyignore 2>/dev/null || printf '.theme-incoming/\n' >> .shopifyignore
 grep -q '^design/' .shopifyignore 2>/dev/null || printf 'node_modules/\nparity/\ndesign/\nscripts/\n' >> .shopifyignore

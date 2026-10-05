@@ -57,8 +57,8 @@ deploy when someone else is on the same theme.
 
 `npm run deploy` refuses to push until the code review and security review are stamped (below)
 and `npm run qa` passes. After pushing to the preview theme it runs `npm run seo`,
-`npm run a11y`, `npm run widths` and `npm run speed` on `https://<domain>/?preview_theme_id=<id>` and exits 1 if any fails, so a
-deploy that exits 0 has passed all seven. The domain comes from `--domain` in package.json's
+`npm run a11y`, `npm run widths`, `npm run visual` and `npm run speed` on `https://<domain>/?preview_theme_id=<id>` and exits 1 if any fails, so a
+deploy that exits 0 has passed all eight. The domain comes from `--domain` in package.json's
 deploy script. `--skip-walks` skips the walks while iterating and says so; the deploy before
 a handover is always a full one.
 
@@ -138,6 +138,7 @@ npm run parity                        # design and preview side by side, every s
 npm run seo                           # on-page SEO on the preview, one page per type, before every handover
 npm run a11y                          # WCAG 2.2 AA (axe-core) on the preview, phone and desktop, before every handover
 npm run widths                        # buttons, chevrons and the header at ten widths, 390px to 1920px
+npm run visual                        # every page at four widths against the last approved screenshots
 npm run deploy                        # the only push: QA, push, then SEO and speed on the preview
 npm run deploy -- --skip-walks        # while iterating; never the deploy before a handover
 ```
@@ -327,6 +328,31 @@ Delete this section in a theme repo.
 
 ---
 
+## Every visual change is seen before it ships
+
+A person reviewing a screenshot looks where they expect the change, so a side effect elsewhere in
+the same picture goes unseen. `npm run visual` looks everywhere: it screenshots every page in
+`design/seo-pages.json` at 390, 768, 1024 and 1440px and compares each pixel with the last
+approved set in `design/visual-baseline/` (local to each machine, not committed). Every change is
+listed with where it is on the page, and `parity/visual/<page>@<width>.diff.png` marks it in red.
+
+1. Deploy. The visual walk runs and lists what changed.
+2. Open every `.diff.png` it names, beside the matching `.png`. For each one, say what changed
+   and whether it was meant. A change you did not make is a bug: fix it before anything else.
+3. Only when every change was meant: `npm run visual -- --approve`.
+4. A machine with no baseline reports NO BASELINE and fails: look at every `parity/visual/*.png`
+   once, in full, then approve.
+
+Anything that changes between two loads of the same code goes in `design/visual.json`, so the
+walk stays quiet when nothing changed: `"mask"` blanks a selector on every page (a rotating
+announcement, a live review widget), `"maskOn"` blanks it on some paths, `"ready"` waits for a
+section fetched after load (and fails the page if it never comes), and `"skip"` leaves a page out
+(search results tie-break in no fixed order). Photos are compared loosely, because a photo fetched
+at another size resamples a little differently each load; icons, text and layout are compared
+strictly, because three chevrons lifted 12px change only about 100 pixels. A walk that cries wolf
+gets ignored: if two runs on unchanged code disagree, fix the walk before trusting it. Prove it
+still catches a real change with `VISUAL_TRY_CSS='<css>' npm run visual`.
+
 ## Lessons from real builds
 
 Each of these reached a client review once. They are here so they reach nobody else.
@@ -350,6 +376,11 @@ Each of these reached a client review once. They are here so they reach nobody e
 - **Check what is on screen, not the DOM text.** `textContent` read "Around $530" while the page
   showed "AROUND$530". Open every screenshot and look at it; the walk measures gaps on screen.
   Steps of a multi-step form that start hidden get `data-step` so the walk opens and measures them.
+- **Never test in a background tab.** Headless Chrome renders only the front tab, so anything
+  that waits for an IntersectionObserver (lazy sections, Horizon's menu overflow, an embedded
+  quiz) never runs in the others. Four tabs at once showed the menu under the icons on 12 of 16
+  loads and a blog post's quiz never loading, and neither happens to a visitor. Run walks in
+  separate browsers, one tab each, and check any timing bug in a single tab before calling it real.
 
 ### Match the design, not just the brief
 

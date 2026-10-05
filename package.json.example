@@ -10,11 +10,14 @@
     "deploy": "node scripts/deploy.mjs --store FILL-IN.myshopify.com --theme FILL-IN-PREVIEW-THEME-ID --domain FILL-IN-www.store-domain.com.au",
     "review:stamp": "node scripts/review-stamp.mjs",
     "a11y": "node scripts/qa/a11y-walk.mjs",
-    "widths": "node scripts/qa/widths-walk.mjs"
+    "widths": "node scripts/qa/widths-walk.mjs",
+    "visual": "node scripts/qa/visual-walk.mjs"
   },
   "devDependencies": {
     "puppeteer-core": "^23",
     "chrome-launcher": "^1",
-    "axe-core": "^4"
+    "axe-core": "^4",
+    "pixelmatch": "^7",
+    "pngjs": "^7"
   }
 }

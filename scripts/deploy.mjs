@@ -217,11 +217,11 @@ if (WITH_JSON) {
 // push; the theme is an unpublished preview, so nothing a customer sees has changed. A FAIL here
 // means the preview is not ready to hand over, and the exit code says so.
 if (SKIP_WALKS) {
-  console.log("\nSEO, accessibility, widths and speed NOT CHECKED (--skip-walks). Run a full npm run deploy before any handover.");
+  console.log("\nSEO, accessibility, widths, visual and speed NOT CHECKED (--skip-walks). Run a full npm run deploy before any handover.");
   process.exit(0);
 }
 if (!DOMAIN) {
-  console.log("\nSEO, accessibility, widths and speed NOT CHECKED: no --domain in package.json's deploy script (the store's real domain, e.g. www.acme.com.au). Add it and deploy again.");
+  console.log("\nSEO, accessibility, widths, visual and speed NOT CHECKED: no --domain in package.json's deploy script (the store's real domain, e.g. www.acme.com.au). Add it and deploy again.");
   process.exit(1);
 }
 const PREVIEW_URL = `https://${DOMAIN}/?preview_theme_id=${THEME}`;
@@ -230,6 +230,7 @@ for (const [label, script, env] of [
   ["SEO", "scripts/qa/seo-walk.mjs", { PREVIEW_URL }],
   ["accessibility", "scripts/qa/a11y-walk.mjs", { PREVIEW_URL }],
   ["widths", "scripts/qa/widths-walk.mjs", { PREVIEW_URL }],
+  ["visual", "scripts/qa/visual-walk.mjs", { PREVIEW_URL }],
   ["speed", "scripts/qa/speed-walk.mjs", { PREVIEW_URL, LIVE_URL: `https://${DOMAIN}/`, RUNS: process.env.RUNS || "3" }],
 ]) {
   console.log(`\n${label} check on ${PREVIEW_URL}`);
