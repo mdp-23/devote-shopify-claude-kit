@@ -57,8 +57,8 @@ deploy when someone else is on the same theme.
 
 `npm run deploy` refuses to push until the code review and security review are stamped (below)
 and `npm run qa` passes. After pushing to the preview theme it runs `npm run seo`,
-`npm run a11y` and `npm run speed` on `https://<domain>/?preview_theme_id=<id>` and exits 1 if either fails, so a
-deploy that exits 0 has passed all six. The domain comes from `--domain` in package.json's
+`npm run a11y`, `npm run widths` and `npm run speed` on `https://<domain>/?preview_theme_id=<id>` and exits 1 if any fails, so a
+deploy that exits 0 has passed all seven. The domain comes from `--domain` in package.json's
 deploy script. `--skip-walks` skips the walks while iterating and says so; the deploy before
 a handover is always a full one.
 
@@ -137,6 +137,7 @@ npm run speed                         # Lighthouse, preview vs live, before ever
 npm run parity                        # design and preview side by side, every section and state
 npm run seo                           # on-page SEO on the preview, one page per type, before every handover
 npm run a11y                          # WCAG 2.2 AA (axe-core) on the preview, phone and desktop, before every handover
+npm run widths                        # buttons, chevrons and the header at ten widths, 390px to 1920px
 npm run deploy                        # the only push: QA, push, then SEO and speed on the preview
 npm run deploy -- --skip-walks        # while iterating; never the deploy before a handover
 ```
@@ -329,6 +330,26 @@ Delete this section in a theme repo.
 ## Lessons from real builds
 
 Each of these reached a client review once. They are here so they reach nobody else.
+
+### Check every width, and look at what renders
+
+- **Phones and 1440px are not the only screens.** Laptops (990px to 1400px) and tablets (768px)
+  are where a split section squeezes its text column and a long header menu runs into the icons.
+  `npm run widths` measures ten widths on every page in `design/seo-pages.json`. On one build a
+  button broke over two lines at 1000px and the menu sat under the search icon from 768px to
+  1180px, and every check at 390px and 1440px passed.
+- **An accessibility fix is a visual change.** Growing a control to the 24px WCAG target moves
+  anything Horizon positions with `translateY(-50%)` by half the new height: a menu chevron rose
+  12px. Changing a Horizon component's markup (a `<ul>` to a `<div>` with `role="list"`) can break
+  its script: `overflow-list.js` type-checked for `<ul>` and `<li>`, threw, and the menu's "More"
+  overflow stopped. After any a11y fix, screenshot the component and read its JS for
+  `instanceof` checks. Guard: `overflow-list-accepts-its-markup`.
+- **A label that mixes words and a price goes in one `<span>`.** In a flex button, the money
+  filter's own `<span>` becomes a separate flex item and the spaces around it vanish
+  ("AROUND$530").
+- **Check what is on screen, not the DOM text.** `textContent` read "Around $530" while the page
+  showed "AROUND$530". Open every screenshot and look at it; the walk measures gaps on screen.
+  Steps of a multi-step form that start hidden get `data-step` so the walk opens and measures them.
 
 ### Match the design, not just the brief
 
