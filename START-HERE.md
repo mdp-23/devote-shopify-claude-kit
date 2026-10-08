@@ -37,8 +37,9 @@ One folder per brand, always. Never work on two brands in one folder.
 ## Setting up a new brand
 
 1. Open Claude Code and start a session in any folder.
-2. Type `set up a new brand`, then give Claude the brand's short name and its store address
-   (Shopify admin, Settings, Domains). Or type `/devote-shopify:new-brand` and pick it from the menu.
+2. Type `/devote-shopify:new-brand` and pick it from the menu (or type `set up a new brand`).
+   Claude asks for the store's website: paste the normal address, for example
+   `www.acme.com.au`. Claude finds the rest.
 3. A browser window opens. Log in to Shopify there. You need to be staff on that store with
    theme access.
 4. Answer Claude's questions about the store.

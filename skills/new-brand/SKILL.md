@@ -1,7 +1,7 @@
 ---
 name: new-brand
-description: Set up a new Devote Shopify brand from scratch, with a folder, the live theme, git and the Devote kit. Use when someone says "set up a new brand", "new Shopify client", "start a new store", or types /devote-shopify:new-brand with a brand name and a .myshopify.com store.
-argument-hint: <brand-folder-name> <store>.myshopify.com
+description: Set up a new Devote Shopify brand from scratch, with a folder, the live theme, git and the Devote kit. Use when someone says "set up a new brand", "new Shopify client", "start a new store", or types /devote-shopify:new-brand. Only needs the store's normal website address; it finds the .myshopify.com address itself.
+argument-hint: [website, e.g. www.acme.com.au]
 allowed-tools: Bash, Read, Edit, Write
 ---
 
@@ -10,13 +10,24 @@ allowed-tools: Bash, Read, Edit, Write
 The person using this is usually not technical. Do every step yourself, explain nothing they
 did not ask about, and only stop for the Shopify login in the browser.
 
-Arguments: `$ARGUMENTS` (brand folder name, then the store's `.myshopify.com` address).
+Argument: `$ARGUMENTS` (optional: the store's website).
 
-1. If either argument is missing, ask for it in one question: the brand's short name (lower
-   case, no spaces, for example `acme`) and its `something.myshopify.com` address. The
-   address is in Shopify admin under Settings, then Domains.
-2. Check `node --version`. If Node is missing, stop and tell them to install the LTS version
+1. Check `node --version` without mentioning it. If Node is missing, stop and tell them to install the LTS version
    from https://nodejs.org and then try again.
+2. If no website was given, reply with just this and wait: "What's the website of the store
+   you're setting up? Paste the normal address, for example www.acme.com.au." Once you have
+   it, run:
+
+   ```bash
+   node "${CLAUDE_PLUGIN_ROOT}/find-store.mjs" <what they pasted>
+   ```
+
+   It prints the store's real `domain`, a `brand` folder name and its `.myshopify.com`
+   `store`. Say them back in one line ("Found it: acme-store.myshopify.com, folder
+   ~/Devote/acme.") and carry on without waiting. If it prints an `error`, tell them what it
+   says in one line and ask for the `.myshopify.com` address instead (Shopify admin, Settings,
+   Domains). If `~/Devote/<brand>` already exists, say so and ask whether to open that folder
+   instead. If they gave a `.myshopify.com` address directly, use it.
 3. Check `shopify version`. If the Shopify CLI is missing, run
    `npm install -g @shopify/cli@latest`. If that fails on permissions, stop and tell them to
    send the error to Marcel.
@@ -35,8 +46,8 @@ Arguments: `$ARGUMENTS` (brand folder name, then the store's `.myshopify.com` ad
    out what you can: which theme it is, which sections are custom. The store is the one
    they gave. Ask only what the code cannot tell you, in one message: the preview theme
    to build on (or offer to create one), and anything unusual about the store. Put the
-   preview theme id and the store's real domain (`--domain www.acme.com.au`) into the
-   `deploy` script in its `package.json`.
+   preview theme id and the store's real domain from step 1 (`--domain www.acme.com.au`)
+   into the `deploy` script in its `package.json`.
 7. Commit in that folder: `git add -A && git commit -m "Fill in CLAUDE.md for <brand>"`.
 8. Finish with one line: the brand is ready, and to start working on it they start a new
    session and choose the folder `~/Devote/<brand>`.

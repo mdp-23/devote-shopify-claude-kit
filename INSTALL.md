@@ -27,7 +27,8 @@ everyone on their next session.
   `.devote-kit-version` with a hash of this kit (`hooks/kit-version.mjs`). Missing or different,
   it tells Claude to run the setup skill before anything else. Silent in any other folder.
 - **`/devote-shopify:setup`**: runs `install.sh` in the open repo and commits the result.
-- **`/devote-shopify:new-brand <name> <store>.myshopify.com`**: runs `new-brand.sh` in `~/Devote`.
+- **`/devote-shopify:new-brand [website]`**: asks for the store's website if not given, finds its
+  `.myshopify.com` address with `find-store.mjs`, then runs `new-brand.sh` in `~/Devote`.
 
 ## What install.sh puts in a brand repo
 
