@@ -29,8 +29,11 @@ Argument: `$ARGUMENTS` (optional: the store's website).
    Domains). If `~/Devote/<brand>` already exists, say so and ask whether to open that folder
    instead. If they gave a `.myshopify.com` address directly, use it.
 3. Check `shopify version`. If the Shopify CLI is missing, run
-   `npm install -g @shopify/cli@latest`. If that fails on permissions, stop and tell them to
-   send the error to Marcel.
+   `sh "${CLAUDE_PLUGIN_ROOT}/install-shopify-cli.sh"`. Never install it with npm directly or with `sudo`
+   yourself: on a Mac with Node from nodejs.org that needs admin rights, and the script
+   installs into the person's own folder instead. Its last line is the `shopify` path; for
+   the rest of this session, put that folder first on PATH in every command that calls
+   `shopify`. If the script fails, stop and tell them to send its output to Marcel.
 4. Run `mkdir -p ~/Devote`, then from `~/Devote` run:
 
    ```bash

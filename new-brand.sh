@@ -46,23 +46,11 @@ say "   node: yes"
 if /usr/bin/env which shopify >/dev/null 2>&1; then
   say "   Shopify CLI: yes"
 else
-  say "   Shopify CLI: not installed"
-  printf "   Install it now? This runs: npm install -g @shopify/cli@latest  [y/N] "
-  read -r reply
-  case "$reply" in
-    [Yy]*)
-      npm install -g @shopify/cli@latest || {
-        warn "That failed. It is usually a permissions problem with npm."
-        warn "Ask Marcel, or try: sudo npm install -g @shopify/cli@latest"
-        exit 1
-      }
-      ;;
-    *)
-      warn "Cannot continue without it. Install it yourself with:"
-      warn "  npm install -g @shopify/cli@latest"
-      exit 1
-      ;;
-  esac
+  say "   Shopify CLI: not installed, installing it"
+  OUT="$(sh "$KIT/install-shopify-cli.sh")" || exit 1
+  printf '%s\n' "$OUT" | sed '$d'
+  PATH="$(dirname "$(printf '%s\n' "$OUT" | tail -n 1)"):$PATH"
+  export PATH
 fi
 
 # ------------------------------------------------------------------ the folder

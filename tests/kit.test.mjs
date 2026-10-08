@@ -42,3 +42,17 @@ test("no client names or real store addresses in anything published", { skip: !i
   }
   assert.deepEqual(problems, []);
 });
+
+test("only install-shopify-cli.sh installs global npm packages, and nothing tells anyone to use sudo", { skip: !inKit }, () => {
+  // Node from nodejs.org leaves npm's global folder owned by root, so a bare `npm install -g` fails
+  // with EACCES on a staff Mac. The installer script falls back to a folder the person owns.
+  const files = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard"], { cwd: KIT, encoding: "utf8" })
+    .split("\n").filter((f) => /\.(sh|md|mjs)$/.test(f) && f !== "install-shopify-cli.sh" && !f.startsWith("tests/"));
+  const problems = [];
+  for (const f of files) {
+    const text = readFileSync(join(KIT, f), "utf8");
+    if (/npm (install|i) (-g|--global)\b/.test(text)) problems.push(`${f}: npm install -g (use install-shopify-cli.sh)`);
+    if (/\bsudo npm\b/.test(text)) problems.push(`${f}: sudo npm`);
+  }
+  assert.deepEqual(problems, []);
+});
