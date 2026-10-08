@@ -18,8 +18,11 @@ On a machine with a different account, install it in the Code tab:
 /plugin install devote-shopify@devote
 ```
 
-plugin.json has no version on purpose, so the version is the git commit and every push reaches
-everyone on their next session.
+plugin.json has no version on purpose, so the version is the git commit. The SessionStart hook
+turns on auto-update for the `devote` marketplace in `~/.claude/settings.json`
+(`hooks/auto-update.mjs`); Claude Code leaves it off for third-party marketplaces, and without it
+a push never reaches anyone. A Mac on a commit from before that hook needs one manual update:
+`claude plugin marketplace update devote && claude plugin update devote-shopify@devote`.
 
 ## What it does
 

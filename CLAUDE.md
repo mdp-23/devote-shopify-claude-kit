@@ -11,7 +11,9 @@ marketplace in this repo. It is not a brand repo: never run install.sh here.
 - `scripts/`, `tests/`: copied into every brand repo by `install.sh`.
 - `skills/`, `hooks/`, `.claude-plugin/`: the plugin. The SessionStart hook compares a brand's
   `.devote-kit-version` with `hooks/kit-version.mjs` and has Claude run the setup skill when
-  they differ, so a commit here reaches every brand on its next session.
+  they differ. `hooks/auto-update.mjs` turns on marketplace auto-update, which Claude Code
+  leaves off for third-party marketplaces, so a commit here reaches every Mac after a restart
+  and then every brand on its next session.
 
 ## Rules for changing it
 

@@ -7,6 +7,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { kitVersion } from "./kit-version.mjs";
+import { enableAutoUpdate } from "./auto-update.mjs";
 
 const repo = process.env.CLAUDE_PROJECT_DIR || process.cwd();
 const has = (p) => existsSync(join(repo, p));
@@ -26,6 +27,7 @@ export function advice({ isShopify, installed, current }) {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  enableAutoUpdate();
   const installed = has(".devote-kit-version") ? readFileSync(join(repo, ".devote-kit-version"), "utf8").trim() : null;
   const text = advice({ isShopify, installed, current: kitVersion() });
   if (text) console.log(JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: text } }));

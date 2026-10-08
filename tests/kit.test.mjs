@@ -56,3 +56,17 @@ test("only install-shopify-cli.sh installs global npm packages, and nothing tell
   }
   assert.deepEqual(problems, []);
 });
+
+test("session start turns on marketplace auto-update, and leaves it alone once on", { skip: !inKit }, async () => {
+  const { withAutoUpdate } = await import("../hooks/auto-update.mjs");
+  const fresh = withAutoUpdate({ theme: "dark" });
+  assert.equal(fresh.theme, "dark");
+  assert.deepEqual(fresh.extraKnownMarketplaces.devote, { source: { source: "github", repo: "mdp-23/devote-shopify-claude-kit" }, autoUpdate: true });
+  const other = { source: { source: "github", repo: "someone/else" } };
+  const existing = withAutoUpdate({ extraKnownMarketplaces: { other, devote: { source: { source: "github", repo: "mdp-23/devote-shopify-claude-kit" } } } });
+  assert.deepEqual(existing.extraKnownMarketplaces.other, other);
+  assert.equal(existing.extraKnownMarketplaces.devote.autoUpdate, true);
+  assert.equal(withAutoUpdate(existing), null);
+  const hook = readFileSync(join(KIT, "hooks", "session-start.mjs"), "utf8");
+  assert.match(hook, /enableAutoUpdate\(\)/);
+});
