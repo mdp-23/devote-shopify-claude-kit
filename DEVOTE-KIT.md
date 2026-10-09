@@ -23,7 +23,12 @@ Do not delete rules because they look obvious. They all look obvious afterwards.
 
 1. **Never push to the live theme.** Not `--live`, not `--allow-live`, not by
    publishing what you pushed. Push unpublished, hand over a preview link, the
-   client publishes.
+   client publishes. **One exception: a development store.** Nobody shops there,
+   so a live push or publish is allowed when Shopify says the store's type is
+   `dev` or `client-transfer` (`shopify store info --store <x> --json`). The
+   ship gate and `npm run deploy` ask Shopify themselves; a note in CLAUDE.md
+   does not count. The command must name its store with `--store`. Deleting a
+   theme is never allowed.
 2. **Never push `config/settings_data.json` or `templates/*.json`** unless that
    is the change and you just pulled them. They hold the merchant's theme editor
    work. A stale copy reverts it silently and the CLI says nothing.
@@ -60,7 +65,9 @@ and `npm run qa` passes. After pushing to the preview theme it runs `npm run seo
 `npm run a11y`, `npm run widths`, `npm run visual` and `npm run speed` on `https://<domain>/?preview_theme_id=<id>` and exits 1 if any fails, so a
 deploy that exits 0 has passed all eight. The domain comes from `--domain` in package.json's
 deploy script. `--skip-walks` skips the walks while iterating and says so; the deploy before
-a handover is always a full one.
+a handover is always a full one. With no `--domain`, deploy stops before pushing, so nothing
+goes up without those checks. On a development store's live theme (see "Never, on any store")
+the same checks run on the live theme.
 
 ## Accessibility
 
@@ -675,7 +682,8 @@ to main reaches staging, a person publishes the live theme.
 `.claude/settings.json`) and denies the tool call for:
 
 1. **Publishing.** `theme publish`, `theme delete`, `--live`, `--allow-live`. No
-   bypass.
+   bypass, except publishing or a live push on a development store, which the
+   gate confirms with Shopify (`scripts/dev-store.mjs`). `theme delete` has none.
 2. **A push carrying merchant files.** Denied until `.shopifyignore` covers them
    or the push names its files with `--only`. No bypass.
 3. **A merge with no evidence.** It reads the PR and checks the three rules below.

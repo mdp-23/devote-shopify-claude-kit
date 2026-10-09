@@ -65,6 +65,7 @@ cp "$KIT/scripts/qa/deferred-plugins-wait.mjs" scripts/qa/deferred-plugins-wait.
 mkdir -p design
 cp "$KIT/scripts/upload-files.py" scripts/upload-files.py
 cp "$KIT/scripts/deploy.mjs" scripts/deploy.mjs
+cp "$KIT/scripts/dev-store.mjs" scripts/dev-store.mjs
 cp "$KIT/scripts/theme-sync.mjs" scripts/theme-sync.mjs
 cp "$KIT/scripts/review-stamp.mjs" scripts/review-stamp.mjs
 cp "$KIT/scripts/kit-suggest.mjs" scripts/kit-suggest.mjs
@@ -73,6 +74,7 @@ cp "$KIT/tests/ship-gate.test.mjs" tests/ship-gate.test.mjs
 cp "$KIT/tests/seo-walk.test.mjs" tests/seo-walk.test.mjs
 cp "$KIT/tests/a11y-walk.test.mjs" tests/a11y-walk.test.mjs
 cp "$KIT/tests/theme-sync.test.mjs" tests/theme-sync.test.mjs
+cp "$KIT/tests/dev-store.test.mjs" tests/dev-store.test.mjs
 [ -f design/seo-pages.json ] || cp "$KIT/seo-pages.json.example" design/seo-pages.json
 say "   DEVOTE-KIT.md, scripts/qa/ship-gate.mjs, scripts/qa/speed-walk.mjs, scripts/qa/seo-walk.mjs, scripts/upload-files.py, scripts/deploy.mjs, tests/ship-gate.test.mjs, tests/seo-walk.test.mjs, design/seo-pages.json (fill in the brand and one URL per page type)"
 

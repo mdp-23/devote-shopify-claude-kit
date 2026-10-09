@@ -4,7 +4,9 @@
 // payload on stdin and enforces four rules:
 //
 //   1. PUBLISH: Claude never publishes a theme, never pushes to the live theme,
-//      and never deletes one. No bypass. The client publishes their own shopfront.
+//      and never deletes one. The client publishes their own shopfront. The one
+//      exception: on a development store (Shopify says so, scripts/dev-store.mjs)
+//      publishing and live pushes are allowed. Deleting a theme never is.
 //
 //   2. MERCHANT FILES: a theme push must not carry config/settings_data.json or
 //      templates/*.json unless the command names them. Those hold what the
@@ -19,10 +21,12 @@
 //   4. PUSH: git push must pass "npm run qa" first. A gate, not a block: pushing
 //      is Claude's to do, it just has to be green. Bypass: SKIP_QA=1.
 //
-// Rule 1 has no escape hatch on purpose. Every other rule here has one, because
-// an unbypassable guard that fires on legitimate work gets torn out. Rule 1 is
-// different: it is a standing instruction about somebody else's shopfront, and
-// the bypass is that a person publishes.
+// Rule 1 has no escape hatch a person or Claude can set. Every other rule here has
+// one, because an unbypassable guard that fires on legitimate work gets torn out.
+// Rule 1 is different: it is a standing instruction about somebody else's
+// shopfront, and the bypass is that a person publishes. The development-store
+// exception is not an escape hatch: it is read from Shopify, so nothing in the
+// repo or the command can claim it.
 //
 // Claude Code hooks only see Claude Code's own tool calls. What a developer runs
 // in their own terminal goes through .git/hooks/pre-push instead.
@@ -30,6 +34,7 @@ import { execSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
+import { checkStore, storesInCommand } from "../dev-store.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -83,6 +88,34 @@ export function executablePart(command) {
 
 export function isPublish(command) {
   return PUBLISH.test(executablePart(command));
+}
+
+const THEME_DELETE = /(?:^|[;&|`(]|\s)(?:npx\s+|pnpm\s+dlx\s+|bunx\s+|yarn\s+)?shopify\s+theme\s+delete\b/;
+
+/**
+ * Whether a publish or live push may go ahead: only on a development store, as Shopify reports
+ * it. Every publishing step in the command must name its store with --store, because a bare one
+ * goes to whatever store the CLI last used, which is not knowable here. Deleting a theme is never
+ * allowed. "check" is injectable for the tests.
+ * @returns {{ allow: boolean, reason: string }}
+ */
+export function publishVerdict(command, { check = checkStore } = {}) {
+  const cmd = executablePart(command);
+  if (THEME_DELETE.test(cmd)) return { allow: false, reason: "it deletes a theme, which is never allowed, development store or not" };
+  const steps = cmd.split(/&&|\|\||[;&|\n`]|\$\(/).filter((step) => PUBLISH.test(step));
+  const stores = new Set();
+  for (const step of steps) {
+    const named = storesInCommand(step);
+    if (!named.length) return { allow: false, reason: "the command does not name its store with --store, so it cannot be checked as a development store" };
+    named.forEach((s) => stores.add(s));
+  }
+  if (!stores.size) return { allow: false, reason: "no store could be read from the command" };
+  for (const store of stores) {
+    const r = check(store);
+    if (r.error) return { allow: false, reason: `could not confirm ${store} is a development store (${r.error})` };
+    if (!r.dev) return { allow: false, reason: `${store} is not a development store (Shopify says type: ${r.type ?? "none, a store we collaborate on"})` };
+  }
+  return { allow: true, reason: `${[...stores].join(", ")} ${stores.size > 1 ? "are development stores" : "is a development store"}` };
 }
 
 /**
@@ -282,15 +315,19 @@ function main() {
     );
   }
 
-  // Rule 1: Claude never publishes, overwrites or deletes a theme
+  // Rule 1: Claude never publishes, overwrites or deletes a theme, except publishing or a live
+  // push on a development store.
   if (isPublish(command)) {
-    deny(
+    // Allowed on a development store, and the rules below (merchant files, QA) still apply.
+    const verdict = publishVerdict(command);
+    if (!verdict.allow) deny(
       "BLOCKED. Claude does not publish, overwrite or delete a theme on a client's " +
       "store. The live theme is somebody's shopfront and the client decides when it " +
-      "changes.\n\n" +
+      `changes. Here, ${verdict.reason}.\n\n` +
       "Do not retry, do not reword the command, and do not look for another route to " +
       "the same effect. Push to an unpublished theme instead, hand over the preview " +
-      "URL, and let them press publish.\n\n" +
+      "URL, and let them press publish. (On a development store, which Shopify must " +
+      "confirm, publishing and live pushes are allowed. Deleting a theme never is.)\n\n" +
       "If you were only quoting the command inside a message or a file, put that text " +
       "in a heredoc body: those are not read as invocations."
     );

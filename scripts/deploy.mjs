@@ -28,6 +28,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, 
 import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import { checkStore } from "./dev-store.mjs";
 import { reviewStatus } from "./review-stamp.mjs";
 import { CODE_GLOBS, classify, codeFilesIn, hashFile } from "./theme-sync.mjs";
 
@@ -94,6 +95,27 @@ function list(dir) {
     }
   }
   return out.sort();
+}
+
+// Never the live theme, unless Shopify says this is a development store (DEVOTE-KIT.md, "Never,
+// on any store"). Before this, a live theme id in package.json would have been pushed to like any
+// preview. Could not check means stop: an unknown theme is not a preview.
+let liveIds;
+try { liveIds = JSON.parse(run(["theme", "list", "--store", STORE, "--role", "live", "--json"])).map((t) => String(t.id)); }
+catch (e) { console.log(`Could not read which theme is live on ${STORE}, so this might be it. Stopping. (${String(e.message).split("\n")[0]})`); process.exit(1); }
+if (!liveIds.length) { console.log(`Shopify listed no live theme on ${STORE}, so it is not known whether ${THEME} is live. Stopping.`); process.exit(1); }
+const TARGET_IS_LIVE = liveIds.includes(String(THEME));
+if (TARGET_IS_LIVE) {
+  const dev = checkStore(STORE);
+  if (dev.error) { console.log(`Theme ${THEME} is the live theme, and it could not be confirmed that ${STORE} is a development store (${dev.error}). Stopping.`); process.exit(1); }
+  if (!dev.dev) { console.log(`Theme ${THEME} is the live theme on ${STORE}, a real store (Shopify type: ${dev.type ?? "none"}). Deploy to an unpublished preview theme instead. Stopping.`); process.exit(1); }
+  console.log(`Theme ${THEME} is the live theme. Allowed: ${STORE} is a development store.`);
+}
+// No domain means no SEO, accessibility or speed checks. Stop before pushing rather than after,
+// so nothing goes up unchecked (--skip-walks says so on purpose).
+if (!DOMAIN && !SKIP_WALKS && !PULL_ONLY) {
+  console.log("Not deploying: no --domain in package.json's deploy script (the store's real domain, e.g. www.acme.com.au), so the SEO, accessibility and speed checks cannot run. Add it and deploy again.");
+  process.exit(1);
 }
 
 // 0. Code someone else pushed (scripts/theme-sync.mjs). Checked before anything else, so a deploy
@@ -213,8 +235,8 @@ if (WITH_JSON) {
   }
 }
 
-// 5. SEO, accessibility and speed on the preview just pushed. They need the pushed theme, so they run after the
-// push; the theme is an unpublished preview, so nothing a customer sees has changed. A FAIL here
+// 5. SEO, accessibility and speed on the theme just pushed. They need the pushed theme, so they run after the
+// push; the theme is an unpublished preview (or a development store's live theme), so no customer has seen it. A FAIL here
 // means the preview is not ready to hand over, and the exit code says so.
 if (SKIP_WALKS) {
   console.log("\nSEO, accessibility, widths, visual and speed NOT CHECKED (--skip-walks). Run a full npm run deploy before any handover.");
@@ -238,7 +260,7 @@ for (const [label, script, env] of [
   catch { failedWalks.push(label); }
 }
 if (failedWalks.length) {
-  console.log(`\nPushed to the preview, but ${failedWalks.join(" and ")} failed. Not ready to hand over: fix it, deploy again, then reflect (DEVOTE-KIT.md, "Reflect after every deploy").`);
+  console.log(`\nPushed to the ${TARGET_IS_LIVE ? "development store's live theme" : "preview"}, but ${failedWalks.join(" and ")} failed. Not ready to hand over: fix it, deploy again, then reflect (DEVOTE-KIT.md, "Reflect after every deploy").`);
   process.exit(1);
 }
-console.log("\nPushed to the preview. QA, code review, security review, SEO, accessibility and speed all passed.");
+console.log(`\nPushed to the ${TARGET_IS_LIVE ? "development store's live theme" : "preview"}. QA, code review, security review, SEO, accessibility and speed all passed.`);
