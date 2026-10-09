@@ -34,9 +34,14 @@ start ("Updating the Devote kit in this repo first.") and one line when done.
      all of it and only add the `@DEVOTE-KIT.md` line and the template's headings it lacks.
 6. If CLAUDE.md still has a FILL THIS IN section, fill it from the code and ask only what
    the code cannot answer.
-7. Check the `deploy` script in package.json has `--store`, `--theme` (the preview theme) and
-   `--domain` (the store's real domain, e.g. `www.acme.com.au`). Fill in what is missing from
-   CLAUDE.md, the store's settings or the live site; ask only if none of them has it.
+7. **Setup is not finished until the `deploy` script in package.json has all three:**
+   `--store` (the `.myshopify.com` address), `--theme` (the preview theme id) and `--domain`
+   (the store's real domain, e.g. `www.acme.com.au`). Without the domain, every deploy skips
+   the SEO, accessibility and speed checks. Read what you can from CLAUDE.md,
+   `shopify theme list --store <store>` and the live site. For anything still missing, ask the
+   person in one message ("To finish setting up I need: ...") and wait for the answer. Do not
+   skip this step, do not leave a FILL-IN value, and do not carry on with other work until
+   `node scripts/qa/deploy-target.mjs` passes.
    Also fill `design/seo-pages.json` with the brand name and one real URL per page type
    (read them off the live site), or the SEO check reports those pages as not checked.
 8. If `scripts/qa/a11y-baseline.json` does not exist and the theme was not built by this kit,

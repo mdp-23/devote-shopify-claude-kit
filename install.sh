@@ -52,6 +52,7 @@ elif ! grep -q '^@DEVOTE-KIT.md' CLAUDE.md; then
 fi
 cp "$KIT/scripts/qa/ship-gate.mjs" scripts/qa/ship-gate.mjs
 cp "$KIT/scripts/qa/run-all.mjs" scripts/qa/run-all.mjs
+cp "$KIT/scripts/qa/deploy-target.mjs" scripts/qa/deploy-target.mjs
 cp "$KIT/scripts/qa/speed-walk.mjs" scripts/qa/speed-walk.mjs
 cp "$KIT/scripts/qa/seo-walk.mjs" scripts/qa/seo-walk.mjs
 cp "$KIT/scripts/qa/a11y-walk.mjs" scripts/qa/a11y-walk.mjs
@@ -75,6 +76,7 @@ cp "$KIT/tests/seo-walk.test.mjs" tests/seo-walk.test.mjs
 cp "$KIT/tests/a11y-walk.test.mjs" tests/a11y-walk.test.mjs
 cp "$KIT/tests/theme-sync.test.mjs" tests/theme-sync.test.mjs
 cp "$KIT/tests/dev-store.test.mjs" tests/dev-store.test.mjs
+cp "$KIT/tests/deploy-target.test.mjs" tests/deploy-target.test.mjs
 [ -f design/seo-pages.json ] || cp "$KIT/seo-pages.json.example" design/seo-pages.json
 say "   DEVOTE-KIT.md, scripts/qa/ship-gate.mjs, scripts/qa/speed-walk.mjs, scripts/qa/seo-walk.mjs, scripts/upload-files.py, scripts/deploy.mjs, tests/ship-gate.test.mjs, tests/seo-walk.test.mjs, design/seo-pages.json (fill in the brand and one URL per page type)"
 
@@ -184,4 +186,5 @@ node "$KIT/hooks/kit-version.mjs" > .devote-kit-version
 say ""
 say "Done. Kit version $(cat .devote-kit-version)."
 grep -q 'FILL THIS IN' CLAUDE.md && say "Left to do: fill in the FILL THIS IN sections of CLAUDE.md."
+node scripts/qa/deploy-target.mjs >/dev/null 2>&1 || say "Left to do: package.json's deploy script needs --store, --theme and --domain. Ask for whatever is missing before finishing."
 say "Then commit: git add -A && git commit -m 'Devote Shopify kit'"

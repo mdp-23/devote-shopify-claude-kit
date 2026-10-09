@@ -15,6 +15,7 @@ test("session start: says nothing outside a Shopify repo, and when the kit is cu
   assert.equal(advice({ isShopify: true, installed: "a", current: "a" }), null);
   assert.match(advice({ isShopify: true, installed: null, current: "a" }), /setup/);
   assert.match(advice({ isShopify: true, installed: "old", current: "a" }), /out of date/);
+  assert.match(advice({ isShopify: true, installed: "a", current: "a", missingTarget: ["the preview theme id (--theme)"] }), /ask the person/);
 });
 
 test("plugin.json has no version, so every commit reaches the team", { skip: !inKit }, () => {

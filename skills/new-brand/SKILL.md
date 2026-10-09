@@ -50,7 +50,10 @@ Argument: `$ARGUMENTS` (optional: the store's website).
    they gave. Ask only what the code cannot tell you, in one message: the preview theme
    to build on (or offer to create one), and anything unusual about the store. Put the
    preview theme id and the store's real domain from step 1 (`--domain www.acme.com.au`)
-   into the `deploy` script in its `package.json`.
+   into the `deploy` script in its `package.json`. The brand is not ready until
+   `node scripts/qa/deploy-target.mjs` passes in that folder: without the store, the preview
+   theme and the domain, deploys cannot push or skip the SEO, accessibility and speed checks.
+   If any is still unknown, ask for it and wait. Never finish with a FILL-IN left in.
 7. Commit in that folder: `git add -A && git commit -m "Fill in CLAUDE.md for <brand>"`.
 8. Finish with one line: the brand is ready, and to start working on it they start a new
    session and choose the folder `~/Devote/<brand>`.

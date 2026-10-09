@@ -66,7 +66,8 @@ and `npm run qa` passes. After pushing to the preview theme it runs `npm run seo
 deploy that exits 0 has passed all eight. The domain comes from `--domain` in package.json's
 deploy script. `--skip-walks` skips the walks while iterating and says so; the deploy before
 a handover is always a full one. With no `--domain`, deploy stops before pushing, so nothing
-goes up without those checks. On a development store's live theme (see "Never, on any store")
+goes up without those checks. `npm run qa` fails (`scripts/qa/deploy-target.mjs`) and every
+session is told to ask for them until `--store`, `--theme` and `--domain` are all filled in. On a development store's live theme (see "Never, on any store")
 the same checks run on the live theme.
 
 ## Accessibility
