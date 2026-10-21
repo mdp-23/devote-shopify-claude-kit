@@ -18,9 +18,9 @@ test("session start: says nothing outside a Shopify repo, and when the kit is cu
   assert.match(advice({ isShopify: true, installed: "a", current: "a", missingTarget: ["the preview theme id (--theme)"] }), /ask the person/);
 });
 
-test("plugin.json has no version, so every commit reaches the team", { skip: !inKit }, () => {
+test("plugin.json has a release version, so Macs update only when it is bumped", { skip: !inKit }, () => {
   const plugin = JSON.parse(readFileSync(join(KIT, ".claude-plugin", "plugin.json"), "utf8"));
-  assert.equal(plugin.version, undefined);
+  assert.match(plugin.version ?? "", /^\d+\.\d+\.\d+$/);
 });
 
 test("no client names or real store addresses in anything published", { skip: !inKit }, () => {

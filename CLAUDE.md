@@ -12,7 +12,7 @@ marketplace in this repo. It is not a brand repo: never run install.sh here.
 - `skills/`, `hooks/`, `.claude-plugin/`: the plugin. The SessionStart hook compares a brand's
   `.devote-kit-version` with `hooks/kit-version.mjs` and has Claude run the setup skill when
   they differ. `hooks/auto-update.mjs` turns on marketplace auto-update, which Claude Code
-  leaves off for third-party marketplaces, so a commit here reaches every Mac after a restart
+  leaves off for third-party marketplaces, so a version bump here reaches every Mac after a restart
   and then every brand on its next session.
 
 ## Rules for changing it
@@ -21,10 +21,14 @@ marketplace in this repo. It is not a brand repo: never run install.sh here.
    client.** Write "a client" or "one build". `tests/no-client-names.test.mjs` fails on any name
    in `.client-names` (kept on this machine, never committed) and on any real
    `.myshopify.com` address. Add new clients to `.client-names`.
-2. **No `version` in plugin.json.** The plugin's version is the commit, so every push reaches the
-   team. A version field that is not bumped freezes them on the old kit.
+2. **Bump `version` in plugin.json to release.** Every Mac only updates when the version changes,
+   so a push without a bump reaches nobody who already has the kit. Bump it once per real release
+   (patch for fixes, minor for new rules or guards), not on every commit. Before 21 Oct 2026 the
+   version was the commit, and each push left an old copy for Claude Code to delete; on one Mac
+   the install record still pointed at a deleted copy and the plugin disappeared without an error.
+   `.githooks/pre-push` warns when kit files changed and the version did not.
 3. A guard only goes in the kit if it works on any theme. One that scans one brand's file names
    belongs in that brand's repo.
-4. Run `node --test tests/*.test.mjs` before every commit, then push. Pushing is the release.
+4. Run `node --test tests/*.test.mjs` before every commit, then push. Bumping the version is the release.
    `.githooks/pre-commit` runs them and blocks the commit if they fail; on a fresh clone turn it
    on with `git config core.hooksPath .githooks`. Never commit with `--no-verify`.

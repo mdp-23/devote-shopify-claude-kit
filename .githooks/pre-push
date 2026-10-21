@@ -1,0 +1,9 @@
+#!/bin/sh
+# Macs only update the kit when plugin.json's version changes. Warns (does not block) when kit
+# files changed since origin/main but the version did not, so a release is not forgotten.
+git rev-parse -q --verify origin/main >/dev/null || exit 0
+v() { git show "$1:.claude-plugin/plugin.json" 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{console.log(JSON.parse(s).version??"")}catch{}})'; }
+[ "$(v origin/main)" != "$(v HEAD)" ] && exit 0
+git diff --quiet origin/main HEAD -- . ':!START-HERE.md' ':!INSTALL.md' ':!CLAUDE.md' && exit 0
+echo "Kit files changed but plugin.json is still version $(v HEAD). Nobody gets this until the version is bumped."
+exit 0
