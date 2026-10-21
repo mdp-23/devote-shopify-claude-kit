@@ -21,6 +21,22 @@ account does this once, and every Mac using the account gets it:
 
 Each Mac also needs Node, once: install the LTS version from nodejs.org.
 
+## If `/devote-` Shows Nothing
+
+First give the app a minute after opening, the menu fills in once it has synced. Then ask
+Claude "what devote-shopify skills do you have?". If it has none, the install record on that
+Mac is pointing at a copy of the kit that has been deleted. Claude Code still lists the plugin
+as enabled when this happens, so it looks fine until you try to use it.
+
+To fix it, open the Terminal app and run these two lines:
+
+```bash
+claude plugin uninstall devote-shopify@devote
+claude plugin install devote-shopify@devote
+```
+
+Then quit the desktop app (Cmd+Q) and reopen it.
+
 ---
 
 ## Working on a brand
