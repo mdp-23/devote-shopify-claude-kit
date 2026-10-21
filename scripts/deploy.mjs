@@ -28,6 +28,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, 
 import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import { reviewLink } from "./approval.mjs";
 import { checkStore } from "./dev-store.mjs";
 import { reviewStatus } from "./review-stamp.mjs";
 import { CODE_GLOBS, classify, codeFilesIn, hashFile } from "./theme-sync.mjs";
@@ -217,6 +218,15 @@ for (const g of ["templates/*.json", "config/settings_data.json", "sections/*.js
 }
 pushChecked(["theme", "push", "--store", STORE, "--theme", THEME, "--nodelete"], { cwd: ROOT });
 console.log("Code pushed. Editor-owned files were not sent.");
+// Every deploy ends with the link a person opens to check the work (Marcel, 21 Oct 2026: "anytime
+// you've done work on staging, you provide a link for the person to review it"). Printed on every
+// exit from here on, so a failed walk still says where to look.
+const REVIEW = reviewLink({ store: STORE, theme: THEME, domain: DOMAIN });
+process.on("exit", () => {
+  console.log(`\nReview link: ${REVIEW}`);
+  console.log("Give this link in the report, pointed at the page the work changed (put its path before ?preview_theme_id).");
+  if (!TARGET_IS_LIVE) console.log('Once a person has checked it, they run npm run approve -- --by "Their name" in their own terminal; then npm run release.');
+});
 // The theme now holds this repo's code: that is the new last sync.
 saveCodeBase({ ...remoteCode, ...localCode });
 

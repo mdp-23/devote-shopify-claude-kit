@@ -26,8 +26,9 @@ this section if there is nothing.
 
 ## Shipping
 
-**FILL THIS IN.** How work reaches the client here: which preview theme, who approves, who
-publishes.
+**FILL THIS IN.** Which preview theme work goes to, and who approves it. The default route to
+live: `npm run deploy`, a person checks the review link and runs `npm run approve`, then
+`npm run release` (DEVOTE-KIT.md, "Approve, then release"). Say here if this store differs.
 
 ## Lessons for this brand
 

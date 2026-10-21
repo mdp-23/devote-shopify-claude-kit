@@ -14,7 +14,30 @@ import {
   verifiedWidths,
   previewLinked,
   mergeTargets,
+  makesApproval,
+  writesApprovalFile,
 } from "../scripts/qa/ship-gate.mjs";
+
+test("rule 5: Claude never makes an approval, however it is spelled", () => {
+  for (const cmd of [
+    'npm run approve -- --by "Marcel"',
+    "node scripts/approve.mjs --by Marcel",
+    "echo '{}' > .release-approval.json",
+    "cp /tmp/x .release-approval.json",
+    'cd theme && npm run approve -- --by "A"',
+  ]) assert.equal(makesApproval(cmd), true, cmd);
+  assert.equal(writesApprovalFile("/Users/a/repo/.release-approval.json"), true);
+  assert.equal(writesApprovalFile(".release-approval.json"), true);
+});
+
+test("rule 5: releasing, deploying and other files stay allowed", () => {
+  for (const cmd of ["npm run release", "npm run deploy", "npm run deploy -- --skip-walks", "git commit -m 'Release'"]) {
+    assert.equal(makesApproval(cmd), false, cmd);
+  }
+  assert.equal(writesApprovalFile("/Users/a/repo/scripts/approval.mjs"), false);
+  assert.equal(writesApprovalFile("/Users/a/repo/releases.log"), false);
+  assert.equal(writesApprovalFile(""), false);
+});
 
 const GREEN = [{ name: "theme-check", conclusion: "SUCCESS" }];
 const REVIEWED = "Code review: /code-review high, 2 findings, 2 fixed.";

@@ -23,8 +23,9 @@ if [ "$KIT" = "$REPO" ]; then
   exit 1
 fi
 
-if [ ! -d .git ]; then
-  warn "This folder is not a git repository."
+# Not "[ -d .git ]": in a git worktree .git is a file, and the installer refused worktrees (21 Oct 2026).
+if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1 || [ "$(git rev-parse --show-toplevel)" != "$(pwd -P)" ]; then
+  warn "This folder is not the top of a git repository."
   warn "Open your Shopify repo and run this from there."
   exit 1
 fi
@@ -50,35 +51,20 @@ if [ ! -f CLAUDE.md ]; then
 elif ! grep -q '^@DEVOTE-KIT.md' CLAUDE.md; then
   say "   MIGRATE: CLAUDE.md does not load DEVOTE-KIT.md yet. It was left as it is."
 fi
-cp "$KIT/scripts/qa/ship-gate.mjs" scripts/qa/ship-gate.mjs
-cp "$KIT/scripts/qa/run-all.mjs" scripts/qa/run-all.mjs
-cp "$KIT/scripts/qa/deploy-target.mjs" scripts/qa/deploy-target.mjs
-cp "$KIT/scripts/qa/speed-walk.mjs" scripts/qa/speed-walk.mjs
-cp "$KIT/scripts/qa/seo-walk.mjs" scripts/qa/seo-walk.mjs
-cp "$KIT/scripts/qa/a11y-walk.mjs" scripts/qa/a11y-walk.mjs
-cp "$KIT/scripts/qa/design-parity-walk.mjs" scripts/qa/design-parity-walk.mjs
-cp "$KIT/scripts/qa/seo-basics.mjs" scripts/qa/seo-basics.mjs
-cp "$KIT/scripts/qa/liquid-no-filters-in-tags.mjs" scripts/qa/liquid-no-filters-in-tags.mjs
-cp "$KIT/scripts/qa/no-typed-prices.mjs" scripts/qa/no-typed-prices.mjs
-cp "$KIT/scripts/qa/no-filter-inside-filter-args.mjs" scripts/qa/no-filter-inside-filter-args.mjs
-cp "$KIT/scripts/qa/sized-images-shrink.mjs" scripts/qa/sized-images-shrink.mjs
-cp "$KIT/scripts/qa/deferred-plugins-wait.mjs" scripts/qa/deferred-plugins-wait.mjs
-mkdir -p design
-cp "$KIT/scripts/upload-files.py" scripts/upload-files.py
-cp "$KIT/scripts/deploy.mjs" scripts/deploy.mjs
-cp "$KIT/scripts/dev-store.mjs" scripts/dev-store.mjs
-cp "$KIT/scripts/theme-sync.mjs" scripts/theme-sync.mjs
-cp "$KIT/scripts/review-stamp.mjs" scripts/review-stamp.mjs
-cp "$KIT/scripts/kit-suggest.mjs" scripts/kit-suggest.mjs
-mkdir -p reviews
-cp "$KIT/tests/ship-gate.test.mjs" tests/ship-gate.test.mjs
-cp "$KIT/tests/seo-walk.test.mjs" tests/seo-walk.test.mjs
-cp "$KIT/tests/a11y-walk.test.mjs" tests/a11y-walk.test.mjs
-cp "$KIT/tests/theme-sync.test.mjs" tests/theme-sync.test.mjs
-cp "$KIT/tests/dev-store.test.mjs" tests/dev-store.test.mjs
-cp "$KIT/tests/deploy-target.test.mjs" tests/deploy-target.test.mjs
+# Every script and test the kit has, not a hand-kept list: the list missed the visual and widths
+# walks, which deploy runs, so a brand's deploy failed on scripts it never received (21 Oct 2026).
+mkdir -p design reviews
+for f in "$KIT"/scripts/*.mjs "$KIT"/scripts/*.py "$KIT"/scripts/qa/*.mjs; do
+  cp "$f" "${f#"$KIT"/}"
+done
+for f in "$KIT"/tests/*.test.mjs; do
+  case "$(basename "$f")" in
+    find-store.test.mjs) ;; # tests the kit's own new-brand helper, which brand repos do not have
+    *) cp "$f" "tests/$(basename "$f")" ;;
+  esac
+done
 [ -f design/seo-pages.json ] || cp "$KIT/seo-pages.json.example" design/seo-pages.json
-say "   DEVOTE-KIT.md, scripts/qa/ship-gate.mjs, scripts/qa/speed-walk.mjs, scripts/qa/seo-walk.mjs, scripts/upload-files.py, scripts/deploy.mjs, tests/ship-gate.test.mjs, tests/seo-walk.test.mjs, design/seo-pages.json (fill in the brand and one URL per page type)"
+say "   DEVOTE-KIT.md, every script in scripts/ and scripts/qa/, the tests, design/seo-pages.json (fill in the brand and one URL per page type)"
 
 # --------------------------------------------------------------- .shopifyignore
 say "2. Protecting the merchant's theme editor settings"
@@ -104,12 +90,17 @@ if [ -f .claude/settings.json ]; then
     merged.permissions.deny = [...new Set([...(theirs.permissions?.deny || []).filter((r) => !broken.has(r)), ...mine.permissions.deny])];
     merged.hooks = theirs.hooks || {};
     const pre = merged.hooks.PreToolUse || (merged.hooks.PreToolUse = []);
-    const already = JSON.stringify(pre).includes("ship-gate.mjs");
-    if (!already) pre.push(...mine.hooks.PreToolUse);
+    // Add each gate hook from the kit whose matcher is not wired to the gate yet, so a new one
+    // (the Write and Edit gate for approvals, 21 Oct 2026) reaches repos that already had the Bash one.
+    const added = [];
+    for (const entry of mine.hooks.PreToolUse) {
+      const wired = pre.some((p) => p.matcher === entry.matcher && JSON.stringify(p).includes("ship-gate.mjs"));
+      if (!wired) { pre.push(entry); added.push(entry.matcher); }
+    }
     fs.writeFileSync(".claude/settings.json", JSON.stringify(merged, null, 2) + "\n");
-    console.log(already
-      ? "   your .claude/settings.json already had the gate, left it alone"
-      : "   merged the gate into your existing .claude/settings.json");
+    console.log(added.length
+      ? "   added the gate for " + added.join(", ") + " to your .claude/settings.json"
+      : "   your .claude/settings.json already had the gate, left it alone");
   ' "$KIT/.claude/settings.json.example"
 else
   cp "$KIT/.claude/settings.json.example" .claude/settings.json
@@ -146,6 +137,8 @@ npm install --save-dev --no-audit --no-fund puppeteer-core@23 chrome-launcher@1 
 grep -q '^node_modules/' .gitignore 2>/dev/null || printf 'node_modules/\n/parity/\n.deploy.lock/\n' >> .gitignore
 grep -q 'visual-baseline' .gitignore 2>/dev/null || printf '/design/visual-baseline/\n' >> .gitignore
 grep -q '^.theme-incoming/' .gitignore 2>/dev/null || printf '.theme-incoming/\n' >> .gitignore
+# An approval is one person's go for one release on this machine, used up by the release. Never shared through git.
+grep -q '^.release-approval.json' .gitignore 2>/dev/null || printf '.release-approval.json\n' >> .gitignore
 grep -q '^.theme-incoming/' .shopifyignore 2>/dev/null || printf '.theme-incoming/\n' >> .shopifyignore
 grep -q '^design/' .shopifyignore 2>/dev/null || printf 'node_modules/\nparity/\ndesign/\nscripts/\n' >> .shopifyignore
 
@@ -161,14 +154,17 @@ fi
 
 # ------------------------------------------------------------------ git hook
 say "6. Installing the git hook"
-cat > .git/hooks/pre-push <<'HOOK'
+# git's own hooks folder, not .git/hooks: in a worktree .git is a file
+HOOKS_DIR="$(git rev-parse --git-path hooks)"
+mkdir -p "$HOOKS_DIR"
+cat > "$HOOKS_DIR/pre-push" <<'HOOK'
 #!/bin/sh
 # Claude Code's own gate only sees Claude. This covers what people type.
 if node -e 'process.exit(require("./package.json").scripts?.qa ? 0 : 1)' 2>/dev/null; then
   exec npm run qa
 fi
 HOOK
-chmod +x .git/hooks/pre-push
+chmod +x "$HOOKS_DIR/pre-push"
 say "   done"
 
 # -------------------------------------------------------------------- verify

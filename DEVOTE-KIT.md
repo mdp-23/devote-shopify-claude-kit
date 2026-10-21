@@ -21,9 +21,11 @@ Do not delete rules because they look obvious. They all look obvious afterwards.
 
 ## Never, on any store
 
-1. **Never push to the live theme.** Not `--live`, not `--allow-live`, not by
-   publishing what you pushed. Push unpublished, hand over a preview link, the
-   client publishes. **One exception: a development store.** Nobody shops there,
+1. **Never push to the live theme yourself.** Not `--live`, not `--allow-live`, not by
+   publishing what you pushed. Push to the preview, hand over the review link, and
+   a person approves. **Approved work reaches live through `npm run release`**, which
+   keeps the live theme's id (see "Approve, then release"). Only a person runs
+   `npm run approve`; the gate refuses it from Claude. **The other exception: a development store.** Nobody shops there,
    so a live push or publish is allowed when Shopify says the store's type is
    `dev` or `client-transfer` (`shopify store info --store <x> --json`). The
    ship gate and `npm run deploy` ask Shopify themselves; a note in CLAUDE.md
@@ -147,8 +149,10 @@ npm run seo                           # on-page SEO on the preview, one page per
 npm run a11y                          # WCAG 2.2 AA (axe-core) on the preview, phone and desktop, before every handover
 npm run widths                        # buttons, chevrons and the header at ten widths, 390px to 1920px
 npm run visual                        # every page at four widths against the last approved screenshots
-npm run deploy                        # the only push: QA, push, then SEO and speed on the preview
+npm run deploy                        # the only push to the preview: QA, push, checks, then the review link
 npm run deploy -- --skip-walks        # while iterating; never the deploy before a handover
+npm run approve -- --by "Name"        # a PERSON, in their own terminal, after checking the review link
+npm run release                       # approved code onto the live theme, same theme id
 ```
 
 App:
@@ -676,20 +680,45 @@ count per file and fail when one goes up. The backlog only falls.
 
 ## Shipping
 
-This brand's own shape is in CLAUDE.md. The shape that works: a branch push builds a preview, a merge
-to main reaches staging, a person publishes the live theme.
+This brand's own shape is in CLAUDE.md. The shape that works: a branch push builds a preview, a
+person checks the review link and approves, `npm run release` puts it on the live theme, and the
+branch merges into main.
 
-`scripts/qa/ship-gate.mjs` enforces it as a `PreToolUse` hook on Bash (wired in
+`scripts/qa/ship-gate.mjs` enforces it as a `PreToolUse` hook on Bash, Write and Edit (wired in
 `.claude/settings.json`) and denies the tool call for:
 
 1. **Publishing.** `theme publish`, `theme delete`, `--live`, `--allow-live`. No
    bypass, except publishing or a live push on a development store, which the
    gate confirms with Shopify (`scripts/dev-store.mjs`). `theme delete` has none.
+   Approved work goes live through `npm run release`, not through these.
 2. **A push carrying merchant files.** Denied until `.shopifyignore` covers them
    or the push names its files with `--only`. No bypass.
 3. **A merge with no evidence.** It reads the PR and checks the three rules below.
 4. **A push that is not green.** `npm run qa` first. Bypass `SKIP_QA=1`, and say
    so if you use it.
+5. **An approval.** `npm run approve`, `scripts/approve.mjs`, or writing
+   `.release-approval.json`. No bypass: an approval means a person looked.
+
+### Approve, then release
+
+A client's live theme id often has to stay the same (apps and integrations are tied to it), so
+publishing the preview is not the way approved work goes live (Marcel, 21 Oct 2026: "we want the
+team to be able to merge with main once it has been approved by them manually checking the
+preview link").
+
+1. `npm run deploy`. It ends with the review link.
+2. Give the person the review link, pointed at the page the work changed, and this to paste in
+   their own terminal once they have checked it:
+   `npm run approve -- --by "Their name"`. It refuses unless the preview shows this repo's code,
+   so nobody approves one thing and releases another.
+3. Once they say it is approved, `npm run release` is yours to run. It refuses if the code changed
+   since the approval or the reviews are not stamped. It pushes only the code that differs from
+   live, plus templates live does not have yet. It never touches a template or settings file live
+   already has, and it stops if live holds a file this repo has never seen, bringing that file
+   into `.theme-incoming/` to merge. The live theme keeps its id.
+4. Merge the branch into main and commit `releases.log` (who approved what, when).
+
+Check the live site after the release and say what customers now see.
 
 If the gate blocks something legitimate, fix the gate and its test in the same
 commit. Do not reword a command to slip past it.
@@ -814,15 +843,21 @@ Finish everything that is not blocked first, then say in one line what is blocke
 live.
 
 > Preview is up: PR #41 merged, the size guide renders from the metafield and
-> falls back to nothing when a product has none.
+> falls back to nothing when a product has none. Review it:
+> [the size guide on a product](https://www.acme.com.au/products/tee?preview_theme_id=123)
 
-Say **live** only once the theme is published and you have loaded the published
-URL. A merge is not a publish.
+**Every report on work that went to a preview gives the review link** (deploy prints it), as a
+link a person can click, pointed at the page the work changed rather than the homepage. Several
+pages changed means one link each. Marcel, 21 Oct 2026: "anytime you've done work on staging, you
+provide a link for the person to review it".
+
+Say **live** only once `npm run release` has run (or the theme is published) and you have
+loaded the live URL. A merge is not a release.
 
 **If something needs a person, a second line starting "Needs you:"**, naming the
 one thing and what it unblocks. If nothing does, there is no second line.
 
-> Needs you: publish the preview theme once the client signs off.
+> Needs you: check the review link, then run `npm run approve -- --by "Your name"` in your terminal.
 
 Two lines maximum. What changed, which files, what was checked: all of it belongs
 in the PR body.

@@ -21,6 +21,12 @@
 //   4. PUSH: git push must pass "npm run qa" first. A gate, not a block: pushing
 //      is Claude's to do, it just has to be green. Bypass: SKIP_QA=1.
 //
+//   5. APPROVAL: only a person approves work for the live theme (npm run approve,
+//      run in their own terminal after checking the review link). Claude never runs
+//      it and never writes .release-approval.json. Also wired on Write and Edit.
+//      With a person's approval, `npm run release` (scripts/release.mjs) is the one
+//      route onto a real store's live theme, keeping its theme id.
+//
 // Rule 1 has no escape hatch a person or Claude can set. Every other rule here has
 // one, because an unbypassable guard that fires on legitimate work gets torn out.
 // Rule 1 is different: it is a standing instruction about somebody else's
@@ -265,6 +271,17 @@ export function mergeVerdict({ files = [], body = "", checks = [] } = {}) {
   return { allow: true };
 }
 
+// Rule 5: an approval is a person's. `npm run release` puts approved work on the live theme, and
+// the approval is the only thing standing between a preview and customers, so Claude may never
+// make one: not by running approve, not by writing the file it records (scripts/approval.mjs).
+const APPROVE = /(?:npm\s+run\s+approve\b|scripts\/approve\.mjs|release-approval)/;
+export function makesApproval(command) {
+  return APPROVE.test(executablePart(command));
+}
+export function writesApprovalFile(filePath) {
+  return /(^|\/)\.release-approval\.json$/.test(String(filePath || ""));
+}
+
 export function mergeTargets(command) {
   return [...command.matchAll(/gh\s+pr\s+merge\s+(?:[^\s;&|]*\s+)*?(\d+)\b/g)].map((m) => m[1]);
 }
@@ -303,8 +320,11 @@ function main() {
   }
 
   let command = "";
+  let filePath = "";
   try {
-    command = JSON.parse(payload)?.tool_input?.command ?? "";
+    const input = JSON.parse(payload)?.tool_input ?? {};
+    command = input.command ?? "";
+    filePath = input.file_path ?? input.notebook_path ?? "";
   } catch {
     // An unparseable payload must not silently permit a publish. Fail closed on
     // the rule with no bypass; the push gate can fail open.
@@ -315,8 +335,21 @@ function main() {
     );
   }
 
+  // Rule 5 first: it applies to file edits as well as commands.
+  if (writesApprovalFile(filePath) || makesApproval(command)) {
+    deny(
+      "BLOCKED. Only a person approves work for the live theme. They open the review link, " +
+      "check the work, and run npm run approve -- --by \"Their name\" in their own terminal. " +
+      "Claude never runs approve and never writes .release-approval.json.\n\n" +
+      "Give them the review link and that command, and wait. Once they have approved, " +
+      "npm run release is yours to run."
+    );
+  }
+  if (!command) allow();
+
   // Rule 1: Claude never publishes, overwrites or deletes a theme, except publishing or a live
-  // push on a development store.
+  // push on a development store. The live theme changes through npm run release, after a person's
+  // approval (rule 5).
   if (isPublish(command)) {
     // Allowed on a development store, and the rules below (merchant files, QA) still apply.
     const verdict = publishVerdict(command);
