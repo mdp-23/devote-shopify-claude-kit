@@ -71,3 +71,20 @@ test("session start turns on marketplace auto-update, and leaves it alone once o
   const hook = readFileSync(join(KIT, "hooks", "session-start.mjs"), "utf8");
   assert.match(hook, /enableAutoUpdate\(\)/);
 });
+
+test("the npm guard stops a global install only when it would fail, and always stops sudo", { skip: !inKit }, async () => {
+  const { isGlobalInstall, advice, globalFolderWritable } = await import("../hooks/npm-global-guard.mjs");
+  for (const c of ["npm install -g @shopify/cli", "npm i --global @shopify/cli@latest", "cd x && npm install @shopify/cli -g", "sudo npm install -g @shopify/cli"]) {
+    assert.ok(isGlobalInstall(c), c);
+  }
+  for (const c of ["npm install", "npm install --save-dev glob", "npm run deploy -- -g", "npx @shopify/cli version"]) {
+    assert.ok(!isGlobalInstall(c), c);
+  }
+  assert.match(advice("npm install -g @shopify/cli", false), /install-shopify-cli\.sh/);
+  assert.equal(advice("npm install -g @shopify/cli", true), null);
+  assert.match(advice("sudo npm install -g @shopify/cli", true), /sudo/);
+  assert.equal(advice("npm install", false), null);
+  assert.equal(globalFolderWritable("/usr/bin"), false);
+  const hooks = JSON.parse(readFileSync(join(KIT, "hooks/hooks.json"), "utf8"));
+  assert.ok(JSON.stringify(hooks.hooks.PreToolUse).includes("npm-global-guard.mjs"));
+});

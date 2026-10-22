@@ -15,10 +15,9 @@ if command -v shopify >/dev/null 2>&1; then
   exit 0
 fi
 
-GLOBAL="$(npm prefix -g)"
-if [ ! -w "$GLOBAL/lib" ] || { [ -d "$GLOBAL/lib/node_modules" ] && [ ! -w "$GLOBAL/lib/node_modules" ]; }; then
+use_user_prefix() {
   USER_PREFIX="$HOME/.npm-global"
-  say "   npm's global folder ($GLOBAL) needs admin rights, so installing into $USER_PREFIX instead"
+  say "   npm's global folder ($(npm prefix -g)) needs admin rights, so installing into $USER_PREFIX instead"
   mkdir -p "$USER_PREFIX"
   npm config set prefix "$USER_PREFIX"
   LINE='export PATH="$HOME/.npm-global/bin:$PATH"'
@@ -27,11 +26,27 @@ if [ ! -w "$GLOBAL/lib" ] || { [ -d "$GLOBAL/lib/node_modules" ] && [ ! -w "$GLO
   done
   PATH="$USER_PREFIX/bin:$PATH"
   export PATH
+}
+
+GLOBAL="$(npm prefix -g)"
+SWITCHED=
+if [ ! -w "$GLOBAL/lib" ] || { [ -d "$GLOBAL/lib/node_modules" ] && [ ! -w "$GLOBAL/lib/node_modules" ]; }; then
+  use_user_prefix
+  SWITCHED=1
 fi
 
+# The check above can miss (a folder that looks writable but is not, 22 Oct 2026), so a failed
+# install into the global folder gets one retry in the person's own folder.
 if ! npm install -g --no-audit --no-fund @shopify/cli@latest; then
-  warn "Installing the Shopify CLI failed. Send the output above to Marcel."
-  exit 1
+  if [ -n "$SWITCHED" ]; then
+    warn "Installing the Shopify CLI failed. Send the output above to Marcel."
+    exit 1
+  fi
+  use_user_prefix
+  if ! npm install -g --no-audit --no-fund @shopify/cli@latest; then
+    warn "Installing the Shopify CLI failed. Send the output above to Marcel."
+    exit 1
+  fi
 fi
 
 BIN="$(command -v shopify || true)"
