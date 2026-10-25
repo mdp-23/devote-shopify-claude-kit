@@ -72,6 +72,25 @@ goes up without those checks. `npm run qa` fails (`scripts/qa/deploy-target.mjs`
 session is told to ask for them until `--store`, `--theme` and `--domain` are all filled in. On a development store's live theme (see "Never, on any store")
 the same checks run on the live theme.
 
+### Match the design first, then run the checks once
+
+The walks take minutes per deploy, so running them on every fix makes a build crawl. Each page
+or group of pages is built in this order, every time:
+
+1. **Match.** Deploy with `npm run deploy -- --skip-walks`, then `npm run parity -- <name>` for
+   that page's states only (the filter matches state names, so name each page's states with a
+   shared prefix). Open every picture, fix what differs, and repeat until every picture matches
+   the design at desktop and 390px. No walks in this loop.
+2. **Check once.** When the page matches, run one full `npm run deploy` (all the walks) and one
+   `npm run parity` with no filter, which catches anything the fixes broke on other pages.
+3. **Fix and report.** Fix what those find. A fix that changes how the page looks goes back to
+   step 1 for that page, then one more full deploy. Report only after a full deploy and an
+   unfiltered parity run have both passed.
+
+An edit to shared CSS (the stylesheet, the product card, the header) still gets an unfiltered
+parity run before anything else is deployed, as "Match the design, not just the brief" says.
+A report never rests on a `--skip-walks` deploy.
+
 ## Accessibility
 
 `npm run a11y` runs axe-core against WCAG 2.2 A and AA on every page in `design/seo-pages.json`,
@@ -145,12 +164,13 @@ shopify theme share                   # preview theme plus a shareable link
 npm run qa                            # scripts/qa plus theme check
 npm run speed                         # Lighthouse, preview vs live, before every handover
 npm run parity                        # design and preview side by side, every section and state
+npm run parity -- <name>              # only states whose name contains <name>, while matching one page
 npm run seo                           # on-page SEO on the preview, one page per type, before every handover
 npm run a11y                          # WCAG 2.2 AA (axe-core) on the preview, phone and desktop, before every handover
 npm run widths                        # buttons, chevrons and the header at ten widths, 390px to 1920px
 npm run visual                        # every page at four widths against the last approved screenshots
 npm run deploy                        # the only push to the preview: QA, push, checks, then the review link
-npm run deploy -- --skip-walks        # while iterating; never the deploy before a handover
+npm run deploy -- --skip-walks        # while matching the design; never the deploy before a report
 npm run approve -- --by "Name"        # a PERSON, in their own terminal, after checking the review link
 npm run release                       # approved code onto the live theme, same theme id
 ```
