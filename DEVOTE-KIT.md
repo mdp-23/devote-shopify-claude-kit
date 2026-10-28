@@ -613,6 +613,9 @@ Each of these reached a client review once. They are here so they reach nobody e
   field beside a picker: it is a second image setting nobody asked for.
   `python3 scripts/upload-files.py --store <store> <files>` uploads and prints the
   `shopify://shop_images/...` value to put in the template.
+- **Carry the favicon over.** It is a theme setting, not a store one, so a new theme starts with
+  a blank browser tab icon. Copy the live theme's (Theme settings > Logo and favicon, the same
+  file from Files) on day one. `seo-basics.mjs` fails while `config/settings_data.json` has none.
 - **Never edit the live theme's menus.** Create new menus for the new theme
   (`menuCreate`) and point every menu setting at them: header, mobile drawer and each footer
   column. One footer column left on the store's old menu reads as "the old menu is still

@@ -40,6 +40,15 @@ if (!/name="description"/.test(meta)) problems.push("snippets/meta-tags.liquid: 
 const layout = read("layout/theme.liquid");
 if (!legacy && !/render 'meta-tags'|render "meta-tags"/.test(layout)) problems.push("layout/theme.liquid: does not render snippets/meta-tags");
 if (!/<html[^>]*\slang="\{\{/.test(layout)) problems.push("layout/theme.liquid: <html> needs lang=\"{{ request.locale.iso_code }}\"");
+// A new theme starts with no favicon: the old theme's lives in its own settings, not the store's, so a
+// rebuild shipped with a blank browser tab icon (one build, 28 Oct 2026). The tag has to be in the head,
+// and the setting has to be filled.
+if (!/rel="(shortcut )?icon"/.test(layout) && !/rel="(shortcut )?icon"/.test(meta)) problems.push("layout/theme.liquid: no <link rel=\"icon\">, so the browser tab shows a blank icon");
+if (existsSync(join(ROOT, "config/settings_data.json"))) {
+  const sd = json("config/settings_data.json");
+  const cur = typeof sd.current === "string" ? sd.presets?.[sd.current] : sd.current;
+  if (!cur?.favicon) problems.push("config/settings_data.json: no favicon set; copy the live theme's (Theme settings > Logo and favicon), as a new theme starts without one");
+}
 // Baseline: problems the theme already had when the kit arrived may stay until fixed; new ones fail.
 const BASE = join(dirname(fileURLToPath(import.meta.url)), "seo-basics-baseline.json");
 const known = existsSync(BASE) ? JSON.parse(readFileSync(BASE, "utf8")) : [];
