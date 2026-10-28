@@ -613,6 +613,9 @@ Each of these reached a client review once. They are here so they reach nobody e
   field beside a picker: it is a second image setting nobody asked for.
   `python3 scripts/upload-files.py --store <store> <files>` uploads and prints the
   `shopify://shop_images/...` value to put in the template.
+- **Turn on the cart drawer opening on add.** Horizon only opens the drawer when a product is
+  added if Theme settings > Cart > "Open cart drawer when a product is added" is on
+  (`auto_open_cart_drawer`), and it ships off. Without it the add looks like it did nothing.
 - **Carry the favicon over.** It is a theme setting, not a store one, so a new theme starts with
   a blank browser tab icon. Copy the live theme's (Theme settings > Logo and favicon, the same
   file from Files) on day one. `seo-basics.mjs` fails while `config/settings_data.json` has none.
