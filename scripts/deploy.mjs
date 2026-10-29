@@ -249,7 +249,7 @@ if (WITH_JSON) {
 // push; the theme is an unpublished preview (or a development store's live theme), so no customer has seen it. A FAIL here
 // means the preview is not ready to hand over, and the exit code says so.
 if (SKIP_WALKS) {
-  console.log("\nSEO, accessibility, widths, visual and speed NOT CHECKED (--skip-walks). Run a full npm run deploy before any handover.");
+  console.log("\nForms, SEO, accessibility, widths, visual and speed NOT CHECKED (--skip-walks). Run a full npm run deploy before any handover.");
   process.exit(0);
 }
 if (!DOMAIN) {
@@ -259,6 +259,7 @@ if (!DOMAIN) {
 const PREVIEW_URL = `https://${DOMAIN}/?preview_theme_id=${THEME}`;
 const failedWalks = [];
 for (const [label, script, env] of [
+  ["forms", "scripts/qa/forms-walk.mjs", { PREVIEW_URL, LIVE_URL: `https://${DOMAIN}/` }],
   ["SEO", "scripts/qa/seo-walk.mjs", { PREVIEW_URL }],
   ["accessibility", "scripts/qa/a11y-walk.mjs", { PREVIEW_URL }],
   ["widths", "scripts/qa/widths-walk.mjs", { PREVIEW_URL }],
@@ -273,4 +274,4 @@ if (failedWalks.length) {
   console.log(`\nPushed to the ${TARGET_IS_LIVE ? "development store's live theme" : "preview"}, but ${failedWalks.join(" and ")} failed. Not ready to hand over: fix it, deploy again, then reflect (DEVOTE-KIT.md, "Reflect after every deploy").`);
   process.exit(1);
 }
-console.log(`\nPushed to the ${TARGET_IS_LIVE ? "development store's live theme" : "preview"}. QA, code review, security review, SEO, accessibility and speed all passed.`);
+console.log(`\nPushed to the ${TARGET_IS_LIVE ? "development store's live theme" : "preview"}. QA, code review, security review, forms, SEO, accessibility and speed all passed.`);

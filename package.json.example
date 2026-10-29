@@ -7,6 +7,7 @@
     "speed": "node scripts/qa/speed-walk.mjs",
     "parity": "node scripts/qa/design-parity-walk.mjs",
     "seo": "node scripts/qa/seo-walk.mjs",
+    "forms": "node scripts/qa/forms-walk.mjs",
     "deploy": "node scripts/deploy.mjs --store FILL-IN.myshopify.com --theme FILL-IN-PREVIEW-THEME-ID --domain FILL-IN-www.store-domain.com.au",
     "review:stamp": "node scripts/review-stamp.mjs",
     "approve": "node scripts/approve.mjs",

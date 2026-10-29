@@ -63,9 +63,9 @@ deploy when someone else is on the same theme.
 ## What every deploy runs
 
 `npm run deploy` refuses to push until the code review and security review are stamped (below)
-and `npm run qa` passes. After pushing to the preview theme it runs `npm run seo`,
+and `npm run qa` passes. After pushing to the preview theme it runs `npm run forms`, `npm run seo`,
 `npm run a11y`, `npm run widths`, `npm run visual` and `npm run speed` on `https://<domain>/?preview_theme_id=<id>` and exits 1 if any fails, so a
-deploy that exits 0 has passed all eight. The domain comes from `--domain` in package.json's
+deploy that exits 0 has passed all nine. The domain comes from `--domain` in package.json's
 deploy script. `--skip-walks` skips the walks while iterating and says so; the deploy before
 a handover is always a full one. With no `--domain`, deploy stops before pushing, so nothing
 goes up without those checks. `npm run qa` fails (`scripts/qa/deploy-target.mjs`) and every
@@ -90,6 +90,31 @@ or group of pages is built in this order, every time:
 An edit to shared CSS (the stylesheet, the product card, the header) still gets an unfiltered
 parity run before anything else is deployed, as "Match the design, not just the brief" says.
 A report never rests on a `--skip-walks` deploy.
+
+## Forms keep their destination
+
+A form is judged by where its entries go, never by how it looks. Every form on the live site (an
+email-platform embed such as Klaviyo, a form app, a third-party form, a Shopify contact or
+sign-up form) keeps sending to the same place after a rebuild: the same list, the same flow, the
+same inbox. One rebuild swapped an application form built in the email platform for a theme
+contact form, and the footer sign-up for a Shopify customer form. Both looked right, nothing
+failed, and for a day applications went to the store inbox and new subscribers never got the
+welcome email.
+
+1. **Before replacing any form, find where it sends.** Read the page body as well as the
+   template: embeds often live in the page content in the admin, not in the theme. For an
+   embed, open it in its platform and note the list and any flow it triggers.
+2. **Keep the embed, or rebuild it to post to the same place.** Never replace a marketing or
+   app form with a Shopify contact form. A form rebuilt in the theme to match the design posts
+   to the old destination (for Klaviyo, the client subscriptions API with the same list and the
+   same profile property names) and says so with `data-replaces-form="klaviyo:<form id>"`.
+   Only add that attribute after a real test entry has landed in the same list or inbox.
+3. **Keep the app embed on.** A form app's script (Klaviyo onsite, Privy, Attentive and the
+   like) is switched on per theme. If the new theme does not load it, every pop-up and embedded
+   form from that app is gone.
+4. `npm run forms` compares every page in the live sitemap, the homepage and a product and a
+   collection, live against preview, and fails on any form or form app the preview lost. It
+   runs in every full `npm run deploy`.
 
 ## Accessibility
 
