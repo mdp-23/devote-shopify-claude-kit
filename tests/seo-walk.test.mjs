@@ -247,4 +247,5 @@ test("robots.txt: needs a Sitemap line and must not block everything", () => {
   assert.deepEqual(levels(robotsTxtIssues(200, "User-agent: *\nDisallow: /cart\n")), ["FAIL"]);
   assert.deepEqual(levels(robotsTxtIssues(200, "User-agent: *\nDisallow: /\nSitemap: https://a.com/sitemap.xml")), ["FAIL"]);
   assert.deepEqual(robotsTxtIssues(200, "User-agent: Nutch\nDisallow: /\n\nUser-agent: *\nDisallow: /cart\nSitemap: https://a.com/s.xml"), []);
+  assert.deepEqual(levels(robotsTxtIssues(200, "User-agent: *\nDisallow: /cart\n", { prelaunch: true })), ["WARN"]);
 });

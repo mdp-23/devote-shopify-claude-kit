@@ -490,6 +490,11 @@ Each of these reached a client review once. They are here so they reach nobody e
   visual and speed results that were all from the client's old site, because the store had not
   launched and the real domain still served the old site, which ignores `preview_theme_id`.
   Walks now run on the myshopify.com preview with the storefront password, or say NOT CHECKED.
+- The first real deploy on that store showed speed scoring 100 on an 82 KB page: Lighthouse's
+  Cookie header was lost on Shopify's preview redirect and it measured the password page. Speed
+  now runs Lighthouse in a Chrome that already holds the cookies, and every walk that ends on
+  /password says NOT CHECKED. A score that looks too good is checked, not celebrated. Before
+  launch, a robots.txt with no Sitemap line is a warning to check again at launch, not a fail.
 - **A picture held at a set height needs `max-width: none`.** One build's header logo, a picture
   at a set height in a flex row with `max-width: 100%`, squashed sideways at laptop widths: the
   row narrowed it while its height stayed. The widths walk now checks any header (not only

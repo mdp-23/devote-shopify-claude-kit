@@ -310,10 +310,12 @@ export function linkIsCheckable(url, origin) {
   return true;
 }
 
-export function robotsTxtIssues(status, text) {
+export function robotsTxtIssues(status, text, { prelaunch = false } = {}) {
   if (status !== 200) return [fail("robots.txt", `returns ${status}`)];
   const out = [];
-  if (!/^sitemap:\s*\S+/im.test(text)) out.push(fail("robots.txt", "no Sitemap: line"));
+  // Before launch the store is shut and Shopify's robots.txt can leave the Sitemap line out, so a
+  // missing line is a warning to check again at launch, not a fail of the build.
+  if (!/^sitemap:\s*\S+/im.test(text)) out.push(prelaunch ? warn("robots.txt", "no Sitemap: line (the store has not launched: check again once it is open)") : fail("robots.txt", "no Sitemap: line"));
   // "Disallow: /" in the * group blocks the whole store.
   const star = text.split(/^user-agent:/im).find((g) => /^\s*\*\s*$/m.test(g.split("\n")[0]));
   if (star && /^disallow:\s*\/\s*$/im.test(star)) out.push(fail("robots.txt", "Disallow: / for every crawler"));
@@ -507,7 +509,7 @@ async function main() {
   // Site-wide
   const site = [];
   const get = async (p) => { try { const r = await fetch(new URL(p, base.origin), cookieHeader() ? { headers: { cookie: cookieHeader() } } : undefined); return [r.status, await r.text()]; } catch (e) { notChecked.push(`${p}: ${e.message}`); return [0, ""]; } };
-  site.push(...robotsTxtIssues(...(await get("/robots.txt"))), ...sitemapIssues(...(await get("/sitemap.xml"))));
+  site.push(...robotsTxtIssues(...(await get("/robots.txt")), { prelaunch: process.env.PRELAUNCH === "1" }), ...sitemapIssues(...(await get("/sitemap.xml"))));
 
   // Report
   const cols = ["h1", "headings", "title", "description", "canonical", "robots", "alt", "og", "json-ld", "links"];

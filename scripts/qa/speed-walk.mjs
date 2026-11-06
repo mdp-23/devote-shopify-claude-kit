@@ -15,6 +15,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { onPasswordPage } from "./preview-session.mjs";
 
 const PREVIEW_RAW = process.env.PREVIEW_URL || process.argv[2];
 // Shopify's preview bar (about 370 KB, and it sometimes starts before the first paint) is never
@@ -38,19 +39,41 @@ const COOKIE = process.env.PREVIEW_COOKIE || "";
 const RUNS = Number(process.env.RUNS || 5); // five: on one machine a live site swung from 55 to 87 between runs
 const dir = mkdtempSync(join(tmpdir(), "speed-walk-"));
 
-function lighthouse(url, desktop, i, cookie) {
+// The storefront password (before launch): Lighthouse's --extra-headers Cookie is lost on Shopify's
+// preview redirect, which then sends the run to /password (one build measured an 82 KB password
+// page as a score of 100). So the cookies go into a Chrome launched here, and Lighthouse runs in
+// that Chrome without clearing its storage.
+async function chromeWithCookies(url, cookie) {
+  const { launch } = await import("chrome-launcher");
+  const puppeteer = (await import("puppeteer-core")).default;
+  const chrome = await launch({ chromeFlags: ["--headless=new"] });
+  const b = await puppeteer.connect({ browserURL: `http://127.0.0.1:${chrome.port}` });
+  const p = await b.newPage();
+  const domain = new URL(url).hostname;
+  await p.setCookie(...cookie.split(/;\s*/).filter((kv) => kv.includes("=")).map((kv) => { const k = kv.indexOf("="); return { name: kv.slice(0, k), value: kv.slice(k + 1), domain, path: "/", secure: true }; }));
+  await p.close();
+  b.disconnect();
+  return chrome;
+}
+
+async function lighthouse(url, desktop, i, cookie) {
   const out = join(dir, `${desktop ? "d" : "m"}-${i}-${url.length}.json`);
+  const chrome = cookie ? await chromeWithCookies(url, cookie) : null;
   const args = ["-y", "lighthouse@12", url, "--only-categories=performance", "--output=json",
-    `--output-path=${out}`, "--chrome-flags=--headless=new", "--quiet",
+    `--output-path=${out}`, "--quiet",
     desktop ? "--preset=desktop" : "--form-factor=mobile",
-    ...(cookie ? [`--extra-headers=${JSON.stringify({ Cookie: cookie })}`] : [])];
+    ...(chrome ? [`--port=${chrome.port}`, "--disable-storage-reset"] : ["--chrome-flags=--headless=new"])];
   try {
     execFileSync("npx", args, { stdio: "ignore", timeout: 240000 });
   } catch {
     throw new Error(`Lighthouse did not finish for ${url}`);
+  } finally {
+    if (chrome) await chrome.kill();
   }
   const r = JSON.parse(readFileSync(out, "utf8"));
   if (!r.audits) throw new Error(`Lighthouse returned no audits for ${url}: ${JSON.stringify(r.runtimeError || r.error)}`);
+  const finalUrl = r.finalDisplayedUrl || r.finalUrl;
+  if (onPasswordPage(finalUrl)) throw new Error(`NOT CHECKED: ${url} ended on the store password page, so the score would be the password page's`);
   const reqs = r.audits["network-requests"].details.items;
   return {
     score: Math.round(r.categories.performance.score * 100),
@@ -58,13 +81,14 @@ function lighthouse(url, desktop, i, cookie) {
     tbt: r.audits["total-blocking-time"].numericValue,
     cls: r.audits["cumulative-layout-shift"].numericValue,
     kb: Math.round(reqs.reduce((n, q) => n + (q.transferSize || 0), 0) / 1024),
-    finalUrl: r.finalDisplayedUrl || r.finalUrl,
+    finalUrl,
   };
 }
 
 const median = (xs) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)];
-function measure(url, desktop, cookie = "") {
-  const runs = Array.from({ length: RUNS }, (_, i) => lighthouse(url, desktop, i, cookie));
+async function measure(url, desktop, cookie = "") {
+  const runs = [];
+  for (let i = 0; i < RUNS; i++) runs.push(await lighthouse(url, desktop, i, cookie));
   const pick = (k) => median(runs.map((r) => r[k]));
   return { score: pick("score"), lcp: pick("lcp"), tbt: pick("tbt"), cls: pick("cls"), kb: pick("kb"), finalUrl: runs[0].finalUrl };
 }
@@ -74,8 +98,14 @@ console.log(`Median of ${RUNS} Lighthouse runs each\n`);
 console.log("form     page     score   LCP s   TBT ms   CLS     KB");
 for (const desktop of [false, true]) {
   const form = desktop ? "desktop" : "mobile ";
-  const live = measure(LIVE, desktop);
-  const prev = measure(PREVIEW, desktop, COOKIE);
+  let live, prev;
+  try {
+    live = await measure(LIVE, desktop);
+    prev = await measure(PREVIEW, desktop, COOKIE);
+  } catch (e) {
+    console.log(String(e.message || e));
+    process.exit(1);
+  }
   for (const [name, r] of [[PRELAUNCH ? "old site" : "live   ", live], ["preview", prev]]) {
     console.log(`${form}  ${name}  ${String(r.score).padStart(5)}  ${r.lcp.toFixed(1).padStart(6)}  ${String(Math.round(r.tbt)).padStart(7)}  ${r.cls.toFixed(3)}  ${String(r.kb).padStart(5)}`);
   }
