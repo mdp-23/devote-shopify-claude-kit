@@ -63,9 +63,9 @@ deploy when someone else is on the same theme.
 ## What every deploy runs
 
 `npm run deploy` refuses to push until the code review and security review are stamped (below)
-and `npm run qa` passes. After pushing to the preview theme it runs `npm run forms`, `npm run seo`,
+and `npm run qa` passes. After pushing to the preview theme it runs `npm run carryover`, `npm run forms`, `npm run seo`,
 `npm run a11y`, `npm run widths`, `npm run visual` and `npm run speed` on `https://<domain>/?preview_theme_id=<id>` and exits 1 if any fails, so a
-deploy that exits 0 has passed all nine. The domain comes from `--domain` in package.json's
+deploy that exits 0 has passed all ten. The domain comes from `--domain` in package.json's
 deploy script. `--skip-walks` skips the walks while iterating and says so; the deploy before
 a handover is always a full one. With no `--domain`, deploy stops before pushing, so nothing
 goes up without those checks. `npm run qa` fails (`scripts/qa/deploy-target.mjs`) and every
@@ -122,6 +122,46 @@ welcome email.
 4. `npm run forms` compares every page in the live sitemap, the homepage and a product and a
    collection, live against preview, and fails on any form or form app the preview lost. It
    runs in every full `npm run deploy`.
+
+## Carry Over What the Live Theme Does
+
+A rebuild is checked by looking at the pages, and nobody remembers what the old theme did for some
+products only. One build was about to launch without a "pick up or local delivery only" note that
+the old theme showed on certain products, without a subscription widget and without a product
+options app, and every page still looked right. The client cannot tell you either: it was set up
+years ago by someone else. So the kit reads it from the live theme.
+
+`npm run carryover` pulls the live theme and lists everything it does beyond drawing the page:
+conditions on product tags, types, vendors and handles; metafields and metaobjects; alternate
+templates (with how many products, collections and pages are assigned to each, from the Admin
+API); app blocks and app embeds that are switched on; third-party scripts and tracking code; line
+item properties and cart attributes; cart total thresholds and country conditions. Then it opens a
+sample of product pages on the live theme and the preview, picked to cover every tag, type and
+vendor the live theme tests, and finds text the live theme shows on some products and not others
+(a badge, a delivery note, a returns block). Anything the new build does not carry is a FAIL.
+
+1. **Run it before building, not at the end.** When a build is a new theme rather than an edit of
+   the live one, run `npm run carryover` first and put every item from
+   `design/carryover-report.md` into the plan. The session start says so until the report exists.
+2. **Keep it, or record what replaces it.** Each finding is built into the new theme (the same
+   tag, metafield, app block or text, however the new theme draws it), or written into
+   `design/carryover.json` under `"handled"` with what the new build does instead, or who agreed to
+   drop it and why:
+
+   ```json
+   { "handled": { "tag:local-only": "Note now comes from the shipping.local metafield (blocks/delivery-note.liquid)" } }
+   ```
+
+   A note like "dropped" or "not needed" fails: a person reading it later must be able to check it.
+   Something the client may want back is never yours to drop: ask them.
+3. **Unused is not missing.** A tag no product carries, or a template nothing is assigned to, is
+   listed as unused and passes. A template count needs `shopify store auth --store <store> --scopes
+   read_products,read_content` once; without it templates cannot be counted, so they stay missing.
+4. **Tell a person what was dropped.** The handover names every "handled" item that was dropped,
+   so the client hears it from us before a customer tells them. Commit `design/carryover-report.md`
+   and `design/carryover.json`.
+5. `npm run carryover -- --from <theme id>` compares against another theme, for example the one
+   that was live before a launch, to audit a launch that already happened.
 
 ## Accessibility
 
@@ -197,6 +237,7 @@ npm run qa                            # scripts/qa plus theme check
 npm run speed                         # Lighthouse, preview vs live, before every handover
 npm run parity                        # design and preview side by side, every section and state
 npm run parity -- <name>              # only states whose name contains <name>, while matching one page
+npm run carryover                     # what the live theme does that the new build must keep, before building and in every deploy
 npm run seo                           # on-page SEO on the preview, one page per type, before every handover
 npm run a11y                          # WCAG 2.2 AA (axe-core) on the preview, phone and desktop, before every handover
 npm run widths                        # buttons, chevrons and the header at ten widths, 390px to 1920px
@@ -860,7 +901,7 @@ description, and then you execute it. Plan when the change touches more than one
 file, changes the data model, changes what the merchant maintains, or you have
 not opened this theme before. Skip it for a typo or a padding fix.
 
-Five questions, because getting one wrong means redoing the work:
+Six questions, because getting one wrong means redoing the work:
 
 1. **What is this theme built on.** A fork of Dawn or a paid theme, plus years of
    edits and app injections. Assuming Dawn's structure is the usual wrong turn.
@@ -874,6 +915,8 @@ Five questions, because getting one wrong means redoing the work:
    theme. An app block survives.
 5. **Can Liquid do this.** Discounts, shipping and payment customisation are
    Functions. Finding that out after building it in Liquid wastes the build.
+6. **What does the live theme do that this must keep.** On a new theme, `npm run carryover`
+   answers it (see "Carry Over What the Live Theme Does"). Its report goes into the plan.
 
 Write the plan, then start. "Here is my plan, shall I proceed?" is the round trip
 this file exists to remove. The exception is question 3: if the data model

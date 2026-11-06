@@ -13,7 +13,9 @@ marketplace in this repo. It is not a brand repo: never run install.sh here.
   `.devote-kit-version` with `hooks/kit-version.mjs` and has Claude run the setup skill when
   they differ. `hooks/auto-update.mjs` turns on marketplace auto-update, which Claude Code
   leaves off for third-party marketplaces, so a version bump here reaches every Mac after a restart
-  and then every brand on its next session.
+  and then every brand on its next session. `hooks/kit-required.mjs` blocks theme and app edits, store pushes and
+  Admin API theme writes in any folder without the kit, so the kit's checks cannot be skipped by
+  working outside a brand repo.
 
 ## Rules for changing it
 

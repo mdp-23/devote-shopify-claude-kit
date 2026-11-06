@@ -21,6 +21,21 @@ account does this once, and every Mac using the account gets it:
 
 Each Mac also needs Node, once: install the LTS version from nodejs.org.
 
+## Making It Compulsory on a Mac
+
+Once the plugin is on, Claude will not edit a theme or push to a store from any folder that does
+not have the kit: it sets the kit up first. That only holds on a Mac where the plugin is on. On a
+Mac signed in to any Claude account other than admin@devote, an admin turns it on for every account
+once, in the Terminal app (it asks for the Mac's password):
+
+```bash
+sudo mkdir -p "/Library/Application Support/ClaudeCode" && printf '%s\n' '{"extraKnownMarketplaces":{"devote":{"source":{"source":"github","repo":"mdp-23/devote-shopify-claude-kit"},"autoUpdate":true}},"enabledPlugins":{"devote-shopify@devote":true}}' | sudo tee "/Library/Application Support/ClaudeCode/managed-settings.json"
+```
+
+Then quit the desktop app (Cmd+Q) and reopen it. The plugin installs itself and nobody can switch
+it off on that Mac. This does nothing for work done outside Claude (the admin code editor, another
+editor): the kit cannot see that.
+
 ## If `/devote-` Shows Nothing
 
 First give the app a minute after opening, the menu fills in once it has synced. Then ask

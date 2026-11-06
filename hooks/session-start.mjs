@@ -14,7 +14,7 @@ const repo = process.env.CLAUDE_PROJECT_DIR || process.cwd();
 const has = (p) => existsSync(join(repo, p));
 const isShopify = (has("sections") && has("layout")) || has("shopify.app.toml") || has("DEVOTE-KIT.md");
 
-export function advice({ isShopify, installed, current, missingTarget = [] }) {
+export function advice({ isShopify, installed, current, missingTarget = [], noCarryover = false }) {
   if (!isShopify) return null;
   if (!installed) {
     return "This folder is a Shopify repo without the Devote Shopify kit (or with a copy from before the plugin). " +
@@ -32,6 +32,13 @@ export function advice({ isShopify, installed, current, missingTarget = [] }) {
       "Before any other work, fill them in: read what you can from CLAUDE.md, `shopify theme list --store <store>` and the live site, " +
       "then ask the person for the rest in one message and wait for the answer. Commit the change, then carry on with what they asked.";
   }
+  // Once per brand: what the live theme does for some products only (a delivery note, an app
+  // block, a template) is found before the build, not after launch (DEVOTE-KIT.md, "Carry Over").
+  if (noCarryover) {
+    return "This brand has no record of what its live theme does beyond drawing the page (design/carryover-report.md is missing). " +
+      "Before building anything, run npm run carryover (about two minutes), read design/carryover-report.md, and put every MISSING item into the plan: " +
+      "build it into the new theme or record in design/carryover.json what replaces it. Commit the report, tell the person in one line what it found, then carry on with what they asked.";
+  }
   return null;
 }
 
@@ -40,6 +47,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const installed = has(".devote-kit-version") ? readFileSync(join(repo, ".devote-kit-version"), "utf8").trim() : null;
   const pkg = join(repo, "package.json");
   const missingTarget = isThemeRepo(repo) ? missingDeployTarget(existsSync(pkg) ? readFileSync(pkg, "utf8") : null) : [];
-  const text = advice({ isShopify, installed, current: kitVersion(), missingTarget });
+  const noCarryover = isThemeRepo(repo) && !has("design/carryover-report.md");
+  const text = advice({ isShopify, installed, current: kitVersion(), missingTarget, noCarryover });
   if (text) console.log(JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: text } }));
 }

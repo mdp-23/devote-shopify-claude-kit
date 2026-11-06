@@ -4,7 +4,7 @@
 // while code kept being pushed; one more push of templates/index.json would have wiped it.
 // People edit a live Shopify theme in the editor, and a repo push does not know.
 //
-//   npm run deploy                   # QA, push code, then SEO, accessibility and speed on the preview
+//   npm run deploy                   # QA, push code, then carry-over, forms, SEO, accessibility and speed on the preview
 //   npm run deploy -- --skip-walks   # while iterating: no SEO or speed, and it says so (not for handover)
 //   npm run deploy -- --with-json    # also push your template/settings changes, only if safe
 //   npm run deploy -- --pull         # just bring editor changes and other people's code into the repo
@@ -262,7 +262,7 @@ if (WITH_JSON) {
 // push; the theme is an unpublished preview (or a development store's live theme), so no customer has seen it. A FAIL here
 // means the preview is not ready to hand over, and the exit code says so.
 if (SKIP_WALKS) {
-  console.log("\nForms, SEO, accessibility, widths, visual and speed NOT CHECKED (--skip-walks). Run a full npm run deploy before any handover.");
+  console.log("\nCarry-over, forms, SEO, accessibility, widths, visual and speed NOT CHECKED (--skip-walks). Run a full npm run deploy before any handover.");
   process.exit(0);
 }
 if (!DOMAIN) {
@@ -287,6 +287,7 @@ if (PRELAUNCH) {
 }
 const failedWalks = [];
 for (const [label, script, env] of [
+  ["carry-over", "scripts/qa/carryover-walk.mjs", { SHOPIFY_STORE: STORE, THEME_ID: THEME, SHOP_DOMAIN: DOMAIN, CARRYOVER_BASE: new URL(PREVIEW_URL).origin }],
   ["forms", "scripts/qa/forms-walk.mjs", { PREVIEW_URL, LIVE_URL: target.liveUrl }],
   ["SEO", "scripts/qa/seo-walk.mjs", { PREVIEW_URL }],
   ["accessibility", "scripts/qa/a11y-walk.mjs", { PREVIEW_URL }],
@@ -302,4 +303,4 @@ if (failedWalks.length) {
   console.log(`\nPushed to the ${TARGET_IS_LIVE ? "development store's live theme" : "preview"}, but ${failedWalks.join(" and ")} failed. Not ready to hand over: fix it, deploy again, then reflect (DEVOTE-KIT.md, "Reflect after every deploy").`);
   process.exit(1);
 }
-console.log(`\nPushed to the ${TARGET_IS_LIVE ? "development store's live theme" : "preview"}. QA, code review, security review, forms, SEO, accessibility and speed all passed.`);
+console.log(`\nPushed to the ${TARGET_IS_LIVE ? "development store's live theme" : "preview"}. QA, code review, security review, carry-over, forms, SEO, accessibility, widths, visual and speed all passed.`);
