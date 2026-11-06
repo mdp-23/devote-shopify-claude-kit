@@ -21,6 +21,7 @@
 // data-replaces-form="klaviyo:AbC123"), and only after it was checked to land in the same list
 // or inbox. See "Forms keep their destination" in DEVOTE-KIT.md.
 import { pathToFileURL } from "node:url";
+import { cookieHeader, mergeCookies } from "./preview-session.mjs";
 
 // ------------------------------------------------------------------------------ pure functions
 
@@ -117,11 +118,16 @@ async function main() {
   // Shopify answers ?preview_theme_id with a redirect that sets a cookie, then serves the live
   // theme to any request without it. Every preview page is fetched with that cookie, and a page
   // is only compared once the preview is proved to be a different theme from the live one.
-  const first = await fetch(PREVIEW, { redirect: "manual", headers: { "user-agent": "Mozilla/5.0 (Devote forms walk)" } }).catch(() => null);
-  const cookie = (first?.headers.getSetCookie?.() || []).map((c) => c.split(";")[0]).join("; ");
+  // Before launch the preview lives on the myshopify.com address behind the storefront password
+  // (PREVIEW_COOKIE from deploy.mjs), while LIVE is the old site: preview pages are built from
+  // PREVIEW's own origin, never LIVE's.
+  const pass = cookieHeader();
+  const first = await fetch(PREVIEW, { redirect: "manual", headers: { "user-agent": "Mozilla/5.0 (Devote forms walk)", ...(pass ? { cookie: pass } : {}) } }).catch(() => null);
+  const cookie = mergeCookies(pass, (first?.headers.getSetCookie?.() || []).map((c) => c.split(";")[0]).join("; "));
   const theme = new URL(PREVIEW).searchParams.get("preview_theme_id");
+  const previewBase = new URL(PREVIEW).origin;
   const themeOf = (html) => (html.match(/"themeId":"(\d+)"|\btheme_id:\s*(\d+)/) || []).slice(1).find(Boolean);
-  const previewOf = (path) => { const u = new URL(path, base); u.searchParams.set("preview_theme_id", theme); return u.toString(); };
+  const previewOf = (path) => { const u = new URL(path, previewBase); u.searchParams.set("preview_theme_id", theme); return u.toString(); };
 
   const home = await get(base + "/");
   if (!home) { console.log(`NOT CHECKED: could not fetch ${base}/`); process.exit(1); }

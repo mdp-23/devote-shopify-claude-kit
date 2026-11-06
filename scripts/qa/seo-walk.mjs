@@ -21,6 +21,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { applyCookies, cookieHeader, mergeCookies } from "./preview-session.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -377,7 +378,8 @@ async function fetchFollow(url, headers, maxHops = 5) {
   for (let tries = 0; ; ) {
     let r;
     try {
-      r = await fetch(current, { redirect: "manual", headers });
+      // the storefront password cookie, before launch (scripts/qa/preview-session.mjs)
+      r = await fetch(current, { redirect: "manual", headers: cookieHeader() ? { ...headers, cookie: mergeCookies(cookieHeader(), headers?.cookie) } : headers });
     } catch (e) {
       return { error: e.message };
     }
@@ -427,6 +429,7 @@ async function main() {
   await page.setViewport({ width: 1440, height: 900 });
   await page.setRequestInterception(true);
   page.on("request", (r) => (["image", "media", "font"].includes(r.resourceType()) ? r.abort() : r.continue()));
+  await applyCookies(page, base.toString());
 
   const notChecked = [];
   async function visit(path) {
@@ -502,7 +505,7 @@ async function main() {
 
   // Site-wide
   const site = [];
-  const get = async (p) => { try { const r = await fetch(new URL(p, base.origin)); return [r.status, await r.text()]; } catch (e) { notChecked.push(`${p}: ${e.message}`); return [0, ""]; } };
+  const get = async (p) => { try { const r = await fetch(new URL(p, base.origin), cookieHeader() ? { headers: { cookie: cookieHeader() } } : undefined); return [r.status, await r.text()]; } catch (e) { notChecked.push(`${p}: ${e.message}`); return [0, ""]; } };
   site.push(...robotsTxtIssues(...(await get("/robots.txt"))), ...sitemapIssues(...(await get("/sitemap.xml"))));
 
   // Report

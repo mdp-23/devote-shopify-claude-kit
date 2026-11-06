@@ -30,6 +30,7 @@ import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { reviewLink } from "./approval.mjs";
 import { checkStore } from "./dev-store.mjs";
+import { servesShopify, unlock as unlockStorefront, walkTarget } from "./qa/preview-session.mjs";
 import { reviewStatus } from "./review-stamp.mjs";
 import { CODE_GLOBS, classify, codeFilesIn, hashFile } from "./theme-sync.mjs";
 
@@ -43,7 +44,9 @@ const PULL_ONLY = process.argv.includes("--pull");
 const BASELINE = join(ROOT, ".editor-baseline.json");
 const ONLY_JSON = arg("--json") ? arg("--json").split(",").map((f) => f.trim()).filter(Boolean) : null;
 // The store's real domain: the SEO and speed walks test the preview on it, because the
-// myshopify.com address adds a redirect no visitor pays (see DEVOTE-KIT.md, speed).
+// myshopify.com address adds a redirect no visitor pays (see DEVOTE-KIT.md, speed). Until the
+// store launches the domain serves the old site, so the walks use the myshopify.com preview with
+// the storefront password instead (scripts/qa/preview-session.mjs).
 const DOMAIN = (arg("--domain") || process.env.SHOP_DOMAIN || "").replace(/^https?:\/\//, "").replace(/\/$/, "");
 const SKIP_WALKS = process.argv.includes("--skip-walks");
 const FIRST_SYNC = process.argv.includes("--first-sync");
@@ -221,7 +224,17 @@ console.log("Code pushed. Editor-owned files were not sent.");
 // Every deploy ends with the link a person opens to check the work (Marcel, 21 Oct 2026: "anytime
 // you've done work on staging, you provide a link for the person to review it"). Printed on every
 // exit from here on, so a failed walk still says where to look.
-const REVIEW = reviewLink({ store: STORE, theme: THEME, domain: DOMAIN });
+// A store that has not launched: its real domain still serves the old site, which ignores
+// preview_theme_id, so a walk there measures the old site (one build reported a whole round of
+// results that way). Asked here, so the review link and every walk use the address that shows
+// this theme. Could not check means carry on as before, and say so.
+let ON_SHOPIFY = null;
+if (DOMAIN && !SKIP_WALKS) {
+  ON_SHOPIFY = await servesShopify(DOMAIN);
+  if (ON_SHOPIFY === null) console.log(`Could not check whether ${DOMAIN} is on Shopify yet; the walks run on it as usual.`);
+}
+const PRELAUNCH = ON_SHOPIFY === false;
+const REVIEW = reviewLink({ store: STORE, theme: THEME, domain: PRELAUNCH ? null : DOMAIN });
 process.on("exit", () => {
   console.log(`\nReview link: ${REVIEW}`);
   console.log("Give this link in the report, pointed at the page the work changed (put its path before ?preview_theme_id).");
@@ -256,18 +269,33 @@ if (!DOMAIN) {
   console.log("\nSEO, accessibility, widths, visual and speed NOT CHECKED: no --domain in package.json's deploy script (the store's real domain, e.g. www.acme.com.au). Add it and deploy again.");
   process.exit(1);
 }
-const PREVIEW_URL = `https://${DOMAIN}/?preview_theme_id=${THEME}`;
+let PASSWORD = process.env.STOREFRONT_PASSWORD || "";
+const PW_FILE = join(ROOT, ".storefront-password");
+if (PRELAUNCH && !PASSWORD && existsSync(PW_FILE)) PASSWORD = readFileSync(PW_FILE, "utf8").trim();
+const target = walkTarget({ domain: DOMAIN, store: STORE, theme: THEME, servesShopify: ON_SHOPIFY, password: PASSWORD });
+if (target.needsPassword) {
+  console.log(`\nNOT CHECKED: ${DOMAIN} is not on Shopify yet, so the walks would measure the old site. Put the storefront password in .storefront-password (gitignored) or STOREFRONT_PASSWORD and deploy again.`);
+  process.exit(1);
+}
+const PREVIEW_URL = target.previewUrl;
+const walkEnv = {};
+if (PRELAUNCH) {
+  try { walkEnv.PREVIEW_COOKIE = await unlockStorefront(`https://${STORE}`, PASSWORD); }
+  catch (e) { console.log(`\nNOT CHECKED: ${e.message} by ${STORE}, so the walks cannot open the preview. Fix .storefront-password or STOREFRONT_PASSWORD and deploy again.`); process.exit(1); }
+  walkEnv.PRELAUNCH = "1";
+  console.log(`\nThe walks run on the myshopify.com preview, because ${DOMAIN} is not on Shopify yet (it still serves the old site).`);
+}
 const failedWalks = [];
 for (const [label, script, env] of [
-  ["forms", "scripts/qa/forms-walk.mjs", { PREVIEW_URL, LIVE_URL: `https://${DOMAIN}/` }],
+  ["forms", "scripts/qa/forms-walk.mjs", { PREVIEW_URL, LIVE_URL: target.liveUrl }],
   ["SEO", "scripts/qa/seo-walk.mjs", { PREVIEW_URL }],
   ["accessibility", "scripts/qa/a11y-walk.mjs", { PREVIEW_URL }],
   ["widths", "scripts/qa/widths-walk.mjs", { PREVIEW_URL }],
   ["visual", "scripts/qa/visual-walk.mjs", { PREVIEW_URL }],
-  ["speed", "scripts/qa/speed-walk.mjs", { PREVIEW_URL, LIVE_URL: `https://${DOMAIN}/`, RUNS: process.env.RUNS || "3" }],
+  ["speed", "scripts/qa/speed-walk.mjs", { PREVIEW_URL, LIVE_URL: target.liveUrl, RUNS: process.env.RUNS || "3" }],
 ]) {
   console.log(`\n${label} check on ${PREVIEW_URL}`);
-  try { execFileSync(process.execPath, [join(ROOT, script)], { cwd: ROOT, stdio: "inherit", env: { ...process.env, ...env } }); }
+  try { execFileSync(process.execPath, [join(ROOT, script)], { cwd: ROOT, stdio: "inherit", env: { ...process.env, ...walkEnv, ...env } }); }
   catch { failedWalks.push(label); }
 }
 if (failedWalks.length) {

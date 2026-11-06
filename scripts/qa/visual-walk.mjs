@@ -29,6 +29,7 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { applyCookies } from "./preview-session.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const WIDTHS = [390, 768, 1024, 1440];
@@ -179,6 +180,7 @@ async function main() {
         const u = new URL(r.url());
         if (["xhr", "fetch"].includes(r.resourceType()) && +u.searchParams.get("page") > 1) r.abort(); else r.continue();
       });
+      await applyCookies(page, base.toString());
       const res = await page.goto(withPreview(path, base), { waitUntil: "load", timeout: 90000 }).catch((e) => ({ error: e.message }));
       if (res?.error || (res?.status && res.status() >= 400)) { unchecked++; return `NOT CHECKED ${path} at ${w}px: ${res.error || res.status()}`; }
       // the pointer starts at the top-left corner, over the header; a transparent header hovered

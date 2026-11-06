@@ -1,6 +1,6 @@
 // Walk: at every width from a phone to a wide desktop, every button label fits on one line with its
 // spaces, every dropdown chevron sits level with its label, and the header menu stays clear of the
-// search, account and cart icons.
+// search, account and cart icons, and no picture is drawn at a different shape from its file.
 //
 // Exists because the other walks measure 390px and 1440px only, and on one build every one of
 // these reached the client between those widths: a button squeezed onto two lines at a 1000px
@@ -14,6 +14,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { applyCookies } from "./preview-session.mjs";
 import { withPreview } from "./seo-walk.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -49,13 +50,36 @@ function wrappedButtons(selector) {
 }
 
 // Runs in the page: the header menu's last visible link ends before the first header icon starts,
-// and the header fits the screen.
-function headerClash() {
-  const hdr = document.querySelector("#header-component");
+// and the header fits the screen. Any header: Horizon's #header-component, else the first
+// <header>, else [data-header]. On one build a custom header was never checked, because this only
+// knew Horizon's. Generic: the main nav's last visible link is the menu end, and visible elements
+// after the nav (search, account, cart) are the icons.
+export function headerClash() {
+  const hdr = document.querySelector("#header-component") || document.querySelector("header") || document.querySelector("[data-header]");
   if (!hdr) return [];
   const out = [];
-  const links = [...hdr.querySelectorAll(".menu-list__list-item")].filter((l) => !l.slot && l.getClientRects().length && l.getBoundingClientRect().width > 0);
-  const icons = [...hdr.querySelectorAll(".header__column--right > *")].filter((i) => i.getClientRects().length && i.getBoundingClientRect().width > 0);
+  // seen by a visitor: laid out, not hidden, and not inside a faded-out dropdown or overlay
+  const shown = (e) => {
+    if (!e.getClientRects().length || !(e.getBoundingClientRect().width > 0) || getComputedStyle(e).visibility === "hidden") return false;
+    for (let x = e; x && x !== hdr.parentElement; x = x.parentElement) if (+getComputedStyle(x).opacity === 0) return false;
+    return true;
+  };
+  let links = [...hdr.querySelectorAll(".menu-list__list-item")].filter((l) => !l.slot && shown(l));
+  let icons = [...hdr.querySelectorAll(".header__column--right > *")].filter(shown);
+  if (!links.length || !icons.length) {
+    // the main nav: the visible one with the most links
+    const navs = [...hdr.querySelectorAll("nav")].filter(shown);
+    const nav = navs.sort((a, b) => b.querySelectorAll("a").length - a.querySelectorAll("a").length)[0];
+    if (nav) {
+      links = [...nav.querySelectorAll("a")].filter(shown);
+      const after = [...hdr.querySelectorAll("*")].filter((e) => !nav.contains(e) && !e.contains(nav) && (nav.compareDocumentPosition(e) & Node.DOCUMENT_POSITION_FOLLOWING) && shown(e));
+      // the outermost of them only, so a cart button and its svg count once
+      icons = after.filter((e) => !after.some((o) => o !== e && o.contains(e)));
+      // an icon sits on the same row as the menu; a second header row (a search bar) is not one
+      const nr = nav.getBoundingClientRect();
+      icons = icons.filter((i) => { const r = i.getBoundingClientRect(); return r.bottom > nr.top && r.top < nr.bottom; });
+    }
+  }
   if (links.length && icons.length) {
     const end = Math.max(...links.map((l) => l.getBoundingClientRect().right));
     const start = Math.min(...icons.map((i) => i.getBoundingClientRect().left));
@@ -70,6 +94,30 @@ function headerClash() {
     const a = svg.getBoundingClientRect(), t = title.getBoundingClientRect();
     const off = Math.round((a.top + a.height / 2) - (t.top + t.height / 2));
     if (Math.abs(off) > 3) { out.push(`menu chevron sits ${Math.abs(off)}px ${off < 0 ? "above" : "below"} its label`); break; }
+  }
+  return out;
+}
+
+// Runs in the page: pictures drawn at a different shape from the file. On one build a header
+// logo, held at a set height in a flex row with max-width: 100%, was narrowed by the row at laptop
+// widths while its height stayed, so it squashed sideways. Only object-fit: fill (the default)
+// stretches; cover and contain keep the shape on purpose.
+export function squashedImages() {
+  const out = [];
+  for (const img of document.querySelectorAll("img")) {
+    if (!img.getClientRects().length || !img.complete || !img.naturalWidth || !img.naturalHeight) continue;
+    const cs = getComputedStyle(img);
+    if (cs.visibility === "hidden" || cs.display === "none" || cs.objectFit !== "fill") continue;
+    // the content box: padding and borders are not the picture
+    const w = img.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    const h = img.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+    if (w < 24 || h < 24) continue;
+    const drawn = w / h, file = img.naturalWidth / img.naturalHeight;
+    if (Math.abs(drawn / file - 1) > 0.03) {
+      let name = img.getAttribute("alt") || "";
+      try { const u = new URL(img.currentSrc || img.src); if (/^https?:$/.test(u.protocol)) name = u.pathname.split("/").pop() || name; } catch {}
+      out.push(name.slice(0, 60) || "(no name)");
+    }
   }
   return out;
 }
@@ -116,6 +164,7 @@ async function main() {
   try {
     for (const path of pagesToCheck()) {
       const page = await browser.newPage();
+      await applyCookies(page, base.toString());
       const found = {};
       for (const w of WIDTHS) {
         await page.setViewport({ width: w, height: 900, deviceScaleFactor: 1 });
@@ -125,6 +174,7 @@ async function main() {
         for (const label of new Set(await page.evaluate(wrappedButtons, BUTTONS))) (found[`"${label}" wraps`] ||= []).push(w);
         for (const msg of await page.evaluate(headerClash)) (found[msg] ||= []).push(w);
         for (const label of new Set(await page.evaluate(joinedWords))) (found[`"${label}" has words run together`] ||= []).push(w);
+        for (const name of new Set(await page.evaluate(squashedImages))) (found[`picture squashed: ${name}`] ||= []).push(w);
       }
       const bad = Object.entries(found);
       fails += bad.length;

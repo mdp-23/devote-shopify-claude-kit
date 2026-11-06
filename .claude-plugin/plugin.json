@@ -1,6 +1,6 @@
 {
   "name": "devote-shopify",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Devote Digital's Shopify kit: safety gate, deploy, QA guards and shared rules, installed and kept up to date in every brand repo.",
   "author": {
     "name": "Devote Digital",

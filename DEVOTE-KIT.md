@@ -72,6 +72,13 @@ goes up without those checks. `npm run qa` fails (`scripts/qa/deploy-target.mjs`
 session is told to ask for them until `--store`, `--theme` and `--domain` are all filled in. On a development store's live theme (see "Never, on any store")
 the same checks run on the live theme.
 
+For a store that has not launched, put the storefront password in `.storefront-password` in the
+repo root (one line, gitignored by `install.sh`), or set `STOREFRONT_PASSWORD`. Until launch the
+real domain still serves the old site, so deploy checks whether it is on Shopify and, when it is
+not, runs every walk on `https://<store>.myshopify.com/?preview_theme_id=<id>` with that password.
+The speed walk then shows the old site for comparison only, and the review link uses the
+myshopify.com address. Without the password the walks say NOT CHECKED and the deploy exits 1.
+
 ### Match the design first, then run the checks once
 
 The walks take minutes per deploy, so running them on every fix makes a build crawl. Each page
@@ -438,6 +445,14 @@ Each of these reached a client review once. They are here so they reach nobody e
   quiz) never runs in the others. Four tabs at once showed the menu under the icons on 12 of 16
   loads and a blog post's quiz never loading, and neither happens to a visitor. Run walks in
   separate browsers, one tab each, and check any timing bug in a single tab before calling it real.
+- **Before launch, the real domain is the old site.** One build's deploys reported SEO, widths,
+  visual and speed results that were all from the client's old site, because the store had not
+  launched and the real domain still served the old site, which ignores `preview_theme_id`.
+  Walks now run on the myshopify.com preview with the storefront password, or say NOT CHECKED.
+- **A picture held at a set height needs `max-width: none`.** One build's header logo, a picture
+  at a set height in a flex row with `max-width: 100%`, squashed sideways at laptop widths: the
+  row narrowed it while its height stayed. The widths walk now checks any header (not only
+  Horizon's) and fails any picture whose shape changes.
 
 ### Match the design, not just the brief
 

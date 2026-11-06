@@ -18,6 +18,10 @@ for (const dir of ["sections", "snippets"]) {
       const tag = m[0];
       if (!/(\s|\})width=/.test(tag)) continue;
       if (/max-width:\s*100%|\b(img-fluid|w-100)\b|position:\s*absolute/.test(tag)) continue;
+      // A picture held at a set height (a header logo) says max-width: none on purpose: with
+      // max-width 100% in a flex row, the row narrows it while its height stays, and it squashes
+      // (one build's header logo, at laptop widths).
+      if (/max-width:\s*none/.test(tag)) continue;
       if (/width="(\d{1,3})"/.test(tag) && Number(tag.match(/width="(\d{1,3})"/)[1]) <= 300) continue; // small fixed images (cards, icons)
       problems.push(`${dir}/${f}:${src.slice(0, m.index).split("\n").length}: <img> with a width attribute but nothing to stop it overflowing; add max-width: 100%`);
     }

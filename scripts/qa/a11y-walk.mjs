@@ -18,6 +18,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { applyCookies } from "./preview-session.mjs";
 import { pageTypeOf, withPreview } from "./seo-walk.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -95,6 +96,7 @@ async function main() {
   if (!chrome) { console.log("NOT CHECKED: no Chrome found on this machine."); process.exit(1); }
   const browser = await puppeteer.launch({ executablePath: chrome, headless: true });
   const page = await browser.newPage();
+  await applyCookies(page, base.toString());
 
   const baseline = existsSync(BASELINE) ? JSON.parse(readFileSync(BASELINE, "utf8")) : {};
   const notChecked = [];

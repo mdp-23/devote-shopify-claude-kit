@@ -29,14 +29,21 @@ if (!PREVIEW || !LIVE) {
 }
 // Devote's benchmark: mobile performance must sit above 80 (Marcel, 30 Sep 2026).
 const MOBILE_FLOOR = 80;
+// A store that has not launched (deploy.mjs sets PRELAUNCH and PREVIEW_COOKIE): LIVE is the
+// client's old site, not a Shopify theme, so it is shown for comparison only. Being slower than
+// the old site does not fail; the mobile benchmark still does. The cookie (storefront password)
+// goes to the preview runs only.
+const PRELAUNCH = process.env.PRELAUNCH === "1";
+const COOKIE = process.env.PREVIEW_COOKIE || "";
 const RUNS = Number(process.env.RUNS || 5); // five: on one machine a live site swung from 55 to 87 between runs
 const dir = mkdtempSync(join(tmpdir(), "speed-walk-"));
 
-function lighthouse(url, desktop, i) {
+function lighthouse(url, desktop, i, cookie) {
   const out = join(dir, `${desktop ? "d" : "m"}-${i}-${url.length}.json`);
   const args = ["-y", "lighthouse@12", url, "--only-categories=performance", "--output=json",
     `--output-path=${out}`, "--chrome-flags=--headless=new", "--quiet",
-    desktop ? "--preset=desktop" : "--form-factor=mobile"];
+    desktop ? "--preset=desktop" : "--form-factor=mobile",
+    ...(cookie ? [`--extra-headers=${JSON.stringify({ Cookie: cookie })}`] : [])];
   try {
     execFileSync("npx", args, { stdio: "ignore", timeout: 240000 });
   } catch {
@@ -56,8 +63,8 @@ function lighthouse(url, desktop, i) {
 }
 
 const median = (xs) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)];
-function measure(url, desktop) {
-  const runs = Array.from({ length: RUNS }, (_, i) => lighthouse(url, desktop, i));
+function measure(url, desktop, cookie = "") {
+  const runs = Array.from({ length: RUNS }, (_, i) => lighthouse(url, desktop, i, cookie));
   const pick = (k) => median(runs.map((r) => r[k]));
   return { score: pick("score"), lcp: pick("lcp"), tbt: pick("tbt"), cls: pick("cls"), kb: pick("kb"), finalUrl: runs[0].finalUrl };
 }
@@ -68,13 +75,16 @@ console.log("form     page     score   LCP s   TBT ms   CLS     KB");
 for (const desktop of [false, true]) {
   const form = desktop ? "desktop" : "mobile ";
   const live = measure(LIVE, desktop);
-  const prev = measure(PREVIEW, desktop);
-  for (const [name, r] of [["live   ", live], ["preview", prev]]) {
+  const prev = measure(PREVIEW, desktop, COOKIE);
+  for (const [name, r] of [[PRELAUNCH ? "old site" : "live   ", live], ["preview", prev]]) {
     console.log(`${form}  ${name}  ${String(r.score).padStart(5)}  ${r.lcp.toFixed(1).padStart(6)}  ${String(Math.round(r.tbt)).padStart(7)}  ${r.cls.toFixed(3)}  ${String(r.kb).padStart(5)}`);
   }
   if (prev.score < live.score || prev.lcp > live.lcp) {
-    worse = true;
-    console.log(`  WORSE: the preview is slower than live on ${form.trim()}`);
+    if (PRELAUNCH) console.log(`  slower than the old site on ${form.trim()} (not a fail before launch: the old site is not a Shopify theme)`);
+    else {
+      worse = true;
+      console.log(`  WORSE: the preview is slower than live on ${form.trim()}`);
+    }
   }
   if (!desktop && prev.score <= MOBILE_FLOOR) {
     worse = true;
@@ -82,4 +92,5 @@ for (const desktop of [false, true]) {
   }
 }
 console.log("\nThe preview bar is hidden (pb=0); the preview redirect (about 800 ms) still counts against the preview.");
+if (PRELAUNCH) console.log(`The store has not launched: "old site" is ${LIVE}, the client's current site, shown for comparison only.`);
 process.exit(worse ? 1 : 0);

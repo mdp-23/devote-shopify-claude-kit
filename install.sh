@@ -139,6 +139,8 @@ grep -q 'visual-baseline' .gitignore 2>/dev/null || printf '/design/visual-basel
 grep -q '^.theme-incoming/' .gitignore 2>/dev/null || printf '.theme-incoming/\n' >> .gitignore
 # An approval is one person's go for one release on this machine, used up by the release. Never shared through git.
 grep -q '^.release-approval.json' .gitignore 2>/dev/null || printf '.release-approval.json\n' >> .gitignore
+# A store that has not launched: the storefront password the walks use to open the myshopify.com preview.
+grep -q '^.storefront-password' .gitignore 2>/dev/null || printf '.storefront-password\n' >> .gitignore
 grep -q '^.theme-incoming/' .shopifyignore 2>/dev/null || printf '.theme-incoming/\n' >> .shopifyignore
 grep -q '^design/' .shopifyignore 2>/dev/null || printf 'node_modules/\nparity/\ndesign/\nscripts/\n' >> .shopifyignore
 

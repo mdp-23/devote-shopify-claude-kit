@@ -19,6 +19,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import puppeteer from "puppeteer-core";
 import { Launcher } from "chrome-launcher";
+import { applyCookies } from "./preview-session.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const cfg = JSON.parse(readFileSync(join(ROOT, "design/parity.json"), "utf8"));
@@ -43,6 +44,7 @@ async function shoot(side, s) {
   const page = await browser.newPage();
   await page.setViewport({ width: s.width, height: s.height || 900, deviceScaleFactor: 1 });
   const url = side.file ? pathToFileURL(resolve(ROOT, side.file)).href : side.url || cfg.preview;
+  await applyCookies(page, url); // the storefront password, before launch; a design file is left alone
   await page.goto(url, { waitUntil: "networkidle2", timeout: 90000 });
   await new Promise((r) => setTimeout(r, 1500));
   if (side.css) await page.addStyleTag({ content: side.css });
