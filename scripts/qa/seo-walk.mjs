@@ -21,7 +21,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { applyCookies, cookieHeader, mergeCookies } from "./preview-session.mjs";
+import { applyCookies, cookieHeader, mergeCookies, onPasswordPage } from "./preview-session.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -436,6 +436,7 @@ async function main() {
     const url = withPreview(path, base);
     const res = await page.goto(url, { waitUntil: "load", timeout: 90000 }).catch((e) => ({ error: e.message }));
     if (!res || res.error) return { error: res?.error || "no response" };
+    if (onPasswordPage(page.url())) return { error: `the store password page came back, not the page (set .storefront-password or STOREFRONT_PASSWORD)` };
     const served = /theme;desc="(\d+)"/.exec(res.headers()["server-timing"] || "")?.[1];
     if (themeId && served && served !== themeId) return { error: `served theme ${served}, not the preview ${themeId}` };
     await new Promise((ok) => setTimeout(ok, 800)); // app scripts that inject JSON-LD after load

@@ -14,7 +14,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { applyCookies } from "./preview-session.mjs";
+import { applyCookies, onPasswordPage } from "./preview-session.mjs";
 import { withPreview } from "./seo-walk.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -170,6 +170,7 @@ async function main() {
         await page.setViewport({ width: w, height: 900, deviceScaleFactor: 1 });
         const res = await page.goto(withPreview(path, base), { waitUntil: "load", timeout: 90000 }).catch((e) => ({ error: e.message }));
         if (res?.error || (res && res.status && res.status() >= 400)) { unchecked++; console.log(`NOT CHECKED ${path} at ${w}px: ${res.error || res.status()}`); continue; }
+        if (onPasswordPage(page.url())) { unchecked++; console.log(`NOT CHECKED ${path} at ${w}px: the store password page came back, not the page (set .storefront-password or STOREFRONT_PASSWORD)`); continue; }
         await page.evaluate(() => document.fonts.ready);
         for (const label of new Set(await page.evaluate(wrappedButtons, BUTTONS))) (found[`"${label}" wraps`] ||= []).push(w);
         for (const msg of await page.evaluate(headerClash)) (found[msg] ||= []).push(w);

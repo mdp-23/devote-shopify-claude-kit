@@ -2,7 +2,7 @@
 // Run with: node --test tests/
 import { test, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { cookiesFrom, mergeCookies, servesShopify, unlock, walkTarget } from "../scripts/qa/preview-session.mjs";
+import { cookiesFrom, mergeCookies, onPasswordPage, servesShopify, unlock, walkTarget } from "../scripts/qa/preview-session.mjs";
 
 const realFetch = globalThis.fetch;
 afterEach(() => { globalThis.fetch = realFetch; });
@@ -14,10 +14,10 @@ function stub(responses) {
     calls.push({ url: String(url), opts });
     const next = responses.shift();
     if (next instanceof Error) throw next;
-    const { status = 200, headers = {}, setCookie = [] } = next;
+    const { status = 200, headers = {}, setCookie = [], body = "" } = next;
     const h = new Headers(headers);
     h.getSetCookie = () => setCookie;
-    return { status, headers: h, arrayBuffer: async () => new ArrayBuffer(0) };
+    return { status, headers: h, text: async () => body, arrayBuffer: async () => new ArrayBuffer(0) };
   };
   return calls;
 }
@@ -53,18 +53,29 @@ test("servesShopify: a network error is unknown (null), never false", async () =
   assert.equal(await servesShopify("www.example.com.au"), null);
 });
 
-test("unlock: posts the storefront form and returns the cookies", async () => {
-  const calls = stub([{ status: 302, setCookie: ["_shopify_y=abc; path=/; secure", "storefront_digest=d1g; path=/; HttpOnly"] }]);
-  assert.equal(await unlock("https://some-store.example", "pa ss&1"), "_shopify_y=abc; storefront_digest=d1g");
+test("unlock: takes the password page's cookies and token, posts with them, proves the store opened", async () => {
+  const calls = stub([
+    { status: 200, setCookie: ["_shopify_essential=s1; path=/; secure"], body: '<form><input type="hidden" name="authenticity_token" value="tok/1" /></form>' },
+    { status: 302, headers: { location: "https://some-store.example/" } },
+    { status: 200 },
+  ]);
+  assert.equal(await unlock("https://some-store.example", "pa ss&1"), "_shopify_essential=s1");
   assert.equal(calls[0].url, "https://some-store.example/password");
-  assert.equal(calls[0].opts.method, "POST");
-  assert.equal(calls[0].opts.redirect, "manual");
-  assert.equal(calls[0].opts.headers["content-type"], "application/x-www-form-urlencoded");
-  assert.equal(calls[0].opts.body, "form_type=storefront_password&utf8=%E2%9C%93&password=pa%20ss%261");
+  assert.equal(calls[1].opts.method, "POST");
+  assert.equal(calls[1].opts.redirect, "manual");
+  assert.equal(calls[1].opts.headers.cookie, "_shopify_essential=s1");
+  assert.equal(calls[1].opts.headers["content-type"], "application/x-www-form-urlencoded");
+  assert.equal(calls[1].opts.body, "form_type=storefront_password&utf8=%E2%9C%93&password=pa%20ss%261&authenticity_token=tok%2F1");
+  assert.equal(calls[2].url, "https://some-store.example/");
+  assert.equal(calls[2].opts.headers.cookie, "_shopify_essential=s1");
 });
 
-test("unlock: no storefront_digest means the password was rejected", async () => {
-  stub([{ status: 302, setCookie: ["_shopify_y=abc; path=/"] }]);
+test("unlock: a home page that still sends you to /password means the password was rejected", async () => {
+  stub([
+    { status: 200, setCookie: ["_shopify_essential=s1"] },
+    { status: 302, headers: { location: "https://some-store.example/password" } },
+    { status: 302, headers: { location: "https://some-store.example/password" } },
+  ]);
   await assert.rejects(unlock("https://some-store.example", "wrong"), /storefront password rejected/);
 });
 
@@ -98,4 +109,11 @@ test("walkTarget: not launched, no password, walks nothing", () => {
   const t = walkTarget({ ...base, servesShopify: false, password: "" });
   assert.equal(t.needsPassword, true);
   assert.equal(t.previewUrl, null);
+});
+
+test("onPasswordPage: the storefront password page is never a page that was checked", () => {
+  assert.equal(onPasswordPage("https://some-store.example/password"), true);
+  assert.equal(onPasswordPage("https://some-store.example/password?x=1"), true);
+  assert.equal(onPasswordPage("https://some-store.example/pages/password-reset"), false);
+  assert.equal(onPasswordPage("https://some-store.example/"), false);
 });

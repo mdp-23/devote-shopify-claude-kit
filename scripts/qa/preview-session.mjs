@@ -35,18 +35,40 @@ export function cookiesFrom(setCookies) {
 }
 
 /**
- * Posts the storefront password and returns the cookie that opens the store.
+ * Opens a password-protected store and returns the Cookie header that keeps it open.
+ * Shopify keeps the unlock against the session cookie the password page hands out (there is no
+ * storefront_digest cookie any more), so: fetch the password page for its cookies and form token,
+ * post the password with them, then prove it worked by asking for the home page, which redirects
+ * to /password while the store is still shut.
  * @returns {Promise<string>} the Cookie header; throws "storefront password rejected" otherwise
  */
 export async function unlock(origin, password) {
-  const body = `form_type=storefront_password&utf8=%E2%9C%93&password=${encodeURIComponent(password)}`;
-  const r = await fetch(`${origin.replace(/\/$/, "")}/password`, {
+  const base = origin.replace(/\/$/, "");
+  const ua = { "user-agent": "Mozilla/5.0 (Devote deploy)" };
+  const page = await fetch(`${base}/password`, { redirect: "manual", headers: ua });
+  let cookie = cookiesFrom(page.headers.getSetCookie?.() || []);
+  const html = page.text ? await page.text().catch(() => "") : "";
+  const token = (html.match(/name="authenticity_token" value="([^"]+)"/) || [])[1];
+  const body = `form_type=storefront_password&utf8=%E2%9C%93&password=${encodeURIComponent(password)}` + (token ? `&authenticity_token=${encodeURIComponent(token)}` : "");
+  const post = await fetch(`${base}/password`, {
     method: "POST", redirect: "manual", body,
-    headers: { "content-type": "application/x-www-form-urlencoded", "user-agent": "Mozilla/5.0 (Devote deploy)" },
+    headers: { ...ua, "content-type": "application/x-www-form-urlencoded", ...(cookie ? { cookie } : {}) },
   });
-  const cookie = cookiesFrom(r.headers.getSetCookie?.() || []);
-  if (!/(^|;\s*)storefront_digest=/.test(cookie)) throw new Error("storefront password rejected");
+  cookie = mergeCookies(cookie, cookiesFrom(post.headers.getSetCookie?.() || []));
+  const home = await fetch(`${base}/`, { redirect: "manual", headers: { ...ua, ...(cookie ? { cookie } : {}) } });
+  cookie = mergeCookies(cookie, cookiesFrom(home.headers.getSetCookie?.() || []));
+  const shut = home.status >= 300 && home.status < 400 && /\/password\b/.test(home.headers.get("location") || "");
+  if (!cookie || shut || home.status >= 400) throw new Error("storefront password rejected");
   return cookie;
+}
+
+/**
+ * True when Shopify answered with its storefront password page instead of the page asked for: the
+ * store is shut and the cookie is missing or stale. A walk must report that page as NOT CHECKED,
+ * never measure it and pass.
+ */
+export function onPasswordPage(url) {
+  try { return /^\/password\/?$/.test(new URL(String(url)).pathname); } catch { return false; }
 }
 
 export function cookieHeader() {

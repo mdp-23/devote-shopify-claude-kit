@@ -29,7 +29,7 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { applyCookies } from "./preview-session.mjs";
+import { applyCookies, onPasswordPage } from "./preview-session.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const WIDTHS = [390, 768, 1024, 1440];
@@ -183,6 +183,7 @@ async function main() {
       await applyCookies(page, base.toString());
       const res = await page.goto(withPreview(path, base), { waitUntil: "load", timeout: 90000 }).catch((e) => ({ error: e.message }));
       if (res?.error || (res?.status && res.status() >= 400)) { unchecked++; return `NOT CHECKED ${path} at ${w}px: ${res.error || res.status()}`; }
+      if (onPasswordPage(page.url())) { unchecked++; return `NOT CHECKED ${path} at ${w}px: the store password page came back, not the page (set .storefront-password or STOREFRONT_PASSWORD)`; }
       // the pointer starts at the top-left corner, over the header; a transparent header hovered
       // turns solid, so park it off the page
       await page.mouse.move(-10, -10).catch(() => {});

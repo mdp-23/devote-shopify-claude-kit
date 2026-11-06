@@ -18,7 +18,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { applyCookies } from "./preview-session.mjs";
+import { applyCookies, onPasswordPage } from "./preview-session.mjs";
 import { pageTypeOf, withPreview } from "./seo-walk.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -108,6 +108,7 @@ async function main() {
       await page.setViewport({ width, height });
       const res = await page.goto(withPreview(path, base), { waitUntil: "load", timeout: 90000 }).catch((e) => ({ error: e.message }));
       if (!res || res.error || res.status() >= 400) { notChecked.push(`${path} (${label}): ${res?.error || `returned ${res?.status?.()}`}`); summary = null; break; }
+      if (onPasswordPage(page.url())) { notChecked.push(`${path} (${label}): the store password page came back, not the page (set .storefront-password or STOREFRONT_PASSWORD)`); summary = null; break; }
       await new Promise((ok) => setTimeout(ok, 1000)); // app widgets that render after load
       const violations = await page.evaluate(async (src, tags) => {
         // Shopify's preview bar is never served to visitors.
