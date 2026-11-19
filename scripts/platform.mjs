@@ -9,7 +9,7 @@
 // form there, so kit-version.mjs printed nothing and install.sh wrote an empty .devote-kit-version.
 import { execFileSync, execSync } from "node:child_process";
 import { existsSync, realpathSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, posix, resolve, win32 } from "node:path";
 import { fileURLToPath } from "node:url";
 
 // The full path of a command on PATH, or null. On Windows only the PATHEXT forms count: the npm
@@ -76,3 +76,17 @@ export function isMain(metaUrl, argv1 = process.argv[1], platform = process.plat
   };
   return norm(argv1) === norm(fileURLToPath(metaUrl));
 }
+
+// A path in a theme or repo as every baseline and stamp keys it: relative to the root, with forward
+// slashes. Exists because on Windows (Nov 2026) relative() gave "assets\x.woff", so a baseline
+// written by a Windows deploy matched nothing on a Mac and the other way round, and theme check's
+// "d:\..." paths never started with ROOT's "D:\...", so its baseline kept absolute paths. The
+// win32 relative() compares drive letters and folders without case.
+export const slashes = (p) => String(p).replace(/\\/g, "/");
+export function repoPath(root, p, platform = process.platform) {
+  const api = platform === "win32" ? win32 : posix;
+  return slashes(api.isAbsolute(p) ? api.relative(root, p) : p);
+}
+// A baseline read from disk with its file keys in that form, so one written before this fix (or on
+// the other platform) still matches.
+export const slashKeys = (o) => (o && typeof o === "object" ? Object.fromEntries(Object.entries(o).map(([k, v]) => [slashes(k), v])) : o);

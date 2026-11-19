@@ -23,7 +23,9 @@ function repoWith(files) {
   git("init", "-q");
   git("add", "-A");
   git("commit", "-qm", "theme as downloaded");
-  cpSync(join(KIT, "scripts"), join(repo, "scripts"), { recursive: true });
+  // The kit's code only. A brand repo's *-baseline.json files point at its own history (a "from"
+  // commit), which this temporary repo does not have, so every guard failed there (Nov 2026).
+  cpSync(join(KIT, "scripts"), join(repo, "scripts"), { recursive: true, filter: (src) => !src.endsWith("-baseline.json") });
   // No Shopify CLI on PATH, so theme check says NOT CHECKED instead of running for real.
   const env = { ...GIT_ENV, PATH: dirname(execFileSync(process.platform === "win32" ? "where" : "which", ["git"], { encoding: "utf8" }).split(/\r?\n/)[0]) };
   const qa = () => spawnSync(process.execPath, [join(repo, "scripts", "qa", "run-all.mjs")], { cwd: repo, env, encoding: "utf8" }).stdout;

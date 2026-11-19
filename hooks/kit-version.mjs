@@ -7,7 +7,7 @@ import { createHash } from "node:crypto";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import { isMain } from "../scripts/platform.mjs";
+import { isMain, slashes } from "../scripts/platform.mjs";
 
 const KIT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const PARTS = ["DEVOTE-KIT.md", "install.sh", "scripts", "tests", ".claude/settings.json.example", "package.json.example", "seo-pages.json.example"];
@@ -22,7 +22,7 @@ function files(path) {
 export function kitVersion() {
   const hash = createHash("sha256");
   for (const f of PARTS.flatMap(files)) {
-    hash.update(relative(KIT, f) + "\0");
+    hash.update(slashes(relative(KIT, f)) + "\0");
     hash.update(readFileSync(f));
   }
   return hash.digest("hex").slice(0, 12);

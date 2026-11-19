@@ -16,6 +16,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
+import { slashes } from "./platform.mjs";
 
 export const CODE_DIRS = ["sections", "snippets", "blocks", "layout", "assets"];
 export const CODE_FILES = ["config/settings_schema.json"];
@@ -35,13 +36,13 @@ export function codeFilesIn(dir) {
     if (!existsSync(full)) continue;
     for (const f of readdirSync(full)) {
       const p = join(full, f);
-      if (statSync(p).isFile() && !(d === "sections" && f.endsWith(".json"))) out.push(relative(dir, p));
+      if (statSync(p).isFile() && !(d === "sections" && f.endsWith(".json"))) out.push(slashes(relative(dir, p)));
     }
   }
   for (const d of CODE_TEMPLATE_DIRS) {
     const full = join(dir, d);
     if (!existsSync(full)) continue;
-    for (const f of readdirSync(full)) if (f.endsWith(".liquid") && statSync(join(full, f)).isFile()) out.push(relative(dir, join(full, f)));
+    for (const f of readdirSync(full)) if (f.endsWith(".liquid") && statSync(join(full, f)).isFile()) out.push(slashes(relative(dir, join(full, f))));
   }
   for (const f of CODE_FILES) if (existsSync(join(dir, f))) out.push(f);
   return out.sort();

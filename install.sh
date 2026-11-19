@@ -68,11 +68,22 @@ for f in "$KIT"/scripts/*.mjs "$KIT"/scripts/*.py "$KIT"/scripts/qa/*.mjs; do
 done
 for f in "$KIT"/tests/*.test.mjs; do
   case "$(basename "$f")" in
-    find-store.test.mjs) ;; # tests the kit's own new-brand helper, which brand repos do not have
+    find-store.test.mjs|install-retired.test.mjs) ;; # test the kit's own new-brand helper and installer, which brand repos do not have
     *) cp "$f" "tests/$(basename "$f")" ;;
   esac
 done
 [ -f design/seo-pages.json ] || cp "$KIT/seo-pages.json.example" design/seo-pages.json
+# Scripts a brand repo had from before the kit, or the kit has dropped, that would otherwise keep
+# running: npm run qa runs every guard in scripts/qa, and a hook in .claude/settings.json kept
+# calling one (Nov 2026: editor-push-gate.mjs, from before the kit, failed the Windows tests).
+# Each is kept as <file>.before-devote-kit, and step 3 takes its hook entries out.
+RETIRED="scripts/qa/editor-push-gate.mjs"
+for f in $RETIRED; do
+  if [ -f "$f" ]; then
+    mv "$f" "$f.before-devote-kit"
+    say "   retired $f, which the kit no longer uses (kept as $f.before-devote-kit)"
+  fi
+done
 say "   DEVOTE-KIT.md, every script in scripts/ and scripts/qa/, the tests, design/seo-pages.json (fill in the brand and one URL per page type)"
 
 # --------------------------------------------------------------- .shopifyignore
@@ -98,6 +109,21 @@ if [ -f .claude/settings.json ]; then
     const broken = new Set(["Bash(shopify theme push:* --live:*)", "Bash(shopify theme push:* --allow-live:*)"]);
     merged.permissions.deny = [...new Set([...(theirs.permissions?.deny || []).filter((r) => !broken.has(r)), ...mine.permissions.deny])];
     merged.hooks = theirs.hooks || {};
+    // Take out every hook that calls a retired script, so no hook points at a file that is gone.
+    const retired = process.argv.slice(2).map((f) => f.split("/").pop());
+    const dropped = [];
+    for (const [event, entries] of Object.entries(merged.hooks)) {
+      if (!Array.isArray(entries)) continue;
+      merged.hooks[event] = entries.map((e) => {
+        const hooks = (e.hooks || []).filter((h) => {
+          const hit = retired.find((r) => String(h.command || "").includes(r));
+          if (hit) dropped.push(event + " " + hit);
+          return !hit;
+        });
+        return { ...e, hooks };
+      }).filter((e) => e.hooks.length || !Array.isArray(e.hooks));
+    }
+    if (dropped.length) console.log("   took the hooks for retired scripts out of .claude/settings.json: " + dropped.join(", "));
     const pre = merged.hooks.PreToolUse || (merged.hooks.PreToolUse = []);
     // Add each gate hook from the kit whose matcher is not wired to the gate yet, so a new one
     // (the Write and Edit gate for approvals, 21 Oct 2026) reaches repos that already had the Bash one.
@@ -110,7 +136,7 @@ if [ -f .claude/settings.json ]; then
     console.log(added.length
       ? "   added the gate for " + added.join(", ") + " to your .claude/settings.json"
       : "   your .claude/settings.json already had the gate, left it alone");
-  ' "$KIT/.claude/settings.json.example"
+  ' "$KIT/.claude/settings.json.example" $RETIRED
 else
   cp "$KIT/.claude/settings.json.example" .claude/settings.json
   say "   created .claude/settings.json"

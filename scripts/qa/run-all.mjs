@@ -12,7 +12,7 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFile
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { execCli, haveCli } from "../platform.mjs";
+import { execCli, haveCli, repoPath, slashKeys } from "../platform.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SKIP = new Set(["run-all.mjs", "ship-gate.mjs"]);
@@ -43,7 +43,7 @@ if (!haveCli("shopify")) {
     const ROOT = join(HERE, "..", "..");
     const counts = {};
     for (const f of results) {
-      const rel = f.path.startsWith(ROOT) ? f.path.slice(ROOT.length + 1) : f.path;
+      const rel = repoPath(ROOT, f.path);
       const n = f.offenses.filter((o) => o.severity === 0 || o.severity === "error").length;
       if (n) counts[rel] = n;
     }
@@ -51,7 +51,7 @@ if (!haveCli("shopify")) {
       writeFileSync(BASE, JSON.stringify(counts, null, 2) + "\n");
       console.log(`  wrote ${BASE}`);
     }
-    const base = existsSync(BASE) ? JSON.parse(readFileSync(BASE, "utf8")) : {};
+    const base = existsSync(BASE) ? slashKeys(JSON.parse(readFileSync(BASE, "utf8"))) : {};
     const worse = Object.entries(counts).filter(([f, n]) => n > (base[f] || 0));
     if (worse.length) {
       failed.push("theme check");

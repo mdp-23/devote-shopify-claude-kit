@@ -43,7 +43,9 @@ function put(root, files) {
 function setup() {
   const dir = mkdtempSync(join(tmpdir(), "deploy-pull-"));
   const repo = join(dir, "repo"), theme = join(dir, "theme"), bin = join(dir, "bin");
-  cpSync(join(KIT, "scripts"), join(repo, "scripts"), { recursive: true });
+  // The kit's code only. A brand repo's *-baseline.json files point at its own history (a "from"
+  // commit), which this temporary repo does not have, so every guard failed there (Nov 2026).
+  cpSync(join(KIT, "scripts"), join(repo, "scripts"), { recursive: true, filter: (src) => !src.endsWith("-baseline.json") });
   const runJs = join(bin, "node_modules", "@shopify", "cli", "bin", "run.js");
   put(bin, { [join("node_modules", "@shopify", "cli", "bin", "run.js")]: FAKE_CLI });
   writeFileSync(join(bin, "shopify"), `#!/bin/sh\nexec "${process.execPath}" "${runJs}" "$@"\n`);

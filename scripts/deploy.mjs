@@ -31,7 +31,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { reviewLink } from "./approval.mjs";
-import { execCli, sleepSync } from "./platform.mjs";
+import { execCli, slashes, slashKeys, sleepSync } from "./platform.mjs";
 import { checkStore } from "./dev-store.mjs";
 import { servesShopify, unlock as unlockStorefront, walkTarget } from "./qa/preview-session.mjs";
 import { reviewStatus } from "./review-stamp.mjs";
@@ -89,6 +89,9 @@ function pushChecked(args, opts = {}) {
   }
 }
 const hash = (f) => createHash("sha256").update(readFileSync(f)).digest("hex").slice(0, 16);
+// { theme: { file: hash } }, with every file key in forward slashes: a baseline a Windows deploy wrote
+// before 1.6.3 had "assets\x.woff" keys that matched nothing on a Mac. Rewritten that way on the next save.
+const readBaselines = (f) => Object.fromEntries(Object.entries(existsSync(f) ? JSON.parse(readFileSync(f, "utf8")) : {}).map(([t, m]) => [t, slashKeys(m)]));
 function list(dir) {
   const out = [];
   for (const sub of ["templates", "templates/customers", "config", "sections", "locales"]) {
@@ -98,7 +101,7 @@ function list(dir) {
       const p = join(d, f);
       if (!statSync(p).isFile() || !f.endsWith(".json")) continue;
       if (sub === "config" && f !== "settings_data.json") continue;
-      out.push(relative(dir, p));
+      out.push(slashes(relative(dir, p)));
     }
   }
   return out.sort();
@@ -137,7 +140,7 @@ run(["theme", "pull", "--store", STORE, "--theme", THEME, "--path", codeRemoteDi
 const remoteCode = Object.fromEntries(codeFilesIn(codeRemoteDir).map((f) => [f, hashFile(join(codeRemoteDir, f))]));
 if (!Object.keys(remoteCode).length) { console.log("Pulled no code from the theme, so it is not known what others changed. Stopping."); process.exit(1); }
 const localCode = Object.fromEntries(codeFilesIn(ROOT).map((f) => [f, hashFile(join(ROOT, f))]));
-const allCodeBase = existsSync(CODE_BASELINE) ? JSON.parse(readFileSync(CODE_BASELINE, "utf8")) : {};
+const allCodeBase = readBaselines(CODE_BASELINE);
 const saveCodeBase = (b) => { allCodeBase[THEME] = b; writeFileSync(CODE_BASELINE, JSON.stringify(allCodeBase, null, 2) + "\n"); };
 const HAD_CODE_BASE = Boolean(allCodeBase[THEME]);
 const sync = classify(allCodeBase[THEME] || null, remoteCode, localCode);
@@ -186,7 +189,7 @@ run(["theme", "pull", "--store", STORE, "--theme", THEME, "--path", remote, ...o
 const remoteFiles = list(remote);
 if (!remoteFiles.length) { console.log("Pulled nothing from the theme, so nothing is known about the editor. Stopping."); process.exit(1); }
 const remoteHashes = Object.fromEntries(remoteFiles.map((f) => [f, hash(join(remote, f))]));
-const baseline = existsSync(BASELINE) ? JSON.parse(readFileSync(BASELINE, "utf8"))[THEME] || null : null;
+const baseline = readBaselines(BASELINE)[THEME] || null;
 
 // With a baseline, a file the theme changed since then was edited in the editor. Without one, only a
 // file the repo lacks is safe to bring in; the theme's copy of a file the repo has goes to
@@ -199,7 +202,7 @@ const editorUnknown = baseline ? [] : remoteFiles.filter((f) => existsSync(join(
 
 function adoptRemote(files) {
   for (const f of files) { mkdirSync(dirname(join(ROOT, f)), { recursive: true }); cpSync(join(remote, f), join(ROOT, f)); }
-  const all = existsSync(BASELINE) ? JSON.parse(readFileSync(BASELINE, "utf8")) : {};
+  const all = readBaselines(BASELINE);
   all[THEME] = remoteHashes;
   writeFileSync(BASELINE, JSON.stringify(all, null, 2) + "\n");
 }
@@ -281,7 +284,7 @@ if (WITH_JSON) {
     const stage = mkdtempSync(join(tmpdir(), "editor-push-"));
     for (const f of mine) { mkdirSync(dirname(join(stage, f)), { recursive: true }); cpSync(join(ROOT, f), join(stage, f)); }
     pushChecked(["theme", "push", "--store", STORE, "--theme", THEME, "--nodelete", "--path", stage]);
-    const all = existsSync(BASELINE) ? JSON.parse(readFileSync(BASELINE, "utf8")) : {};
+    const all = readBaselines(BASELINE);
     all[THEME] = { ...remoteHashes, ...Object.fromEntries(mine.map((f) => [f, hash(join(ROOT, f))])) };
     writeFileSync(BASELINE, JSON.stringify(all, null, 2) + "\n");
     console.log(`Pushed your changes to:\n  ${mine.join("\n  ")}\nBaseline updated. Commit .editor-baseline.json.`);

@@ -14,7 +14,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { isMain } from "./platform.mjs";
+import { isMain, slashes } from "./platform.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 export const STAMP = join(ROOT, ".review-stamp.json");
@@ -44,7 +44,7 @@ export function codeFiles() {
 
 export function codeHash() {
   const h = createHash("sha256");
-  for (const p of codeFiles()) { h.update(relative(ROOT, p)); h.update("\0"); h.update(readFileSync(p)); h.update("\0"); }
+  for (const p of codeFiles()) { h.update(slashes(relative(ROOT, p))); h.update("\0"); h.update(readFileSync(p)); h.update("\0"); }
   return h.digest("hex").slice(0, 20);
 }
 

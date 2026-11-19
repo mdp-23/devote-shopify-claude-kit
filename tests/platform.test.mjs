@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { command, isMain, which } from "../scripts/platform.mjs";
+import { command, isMain, repoPath, slashKeys, which } from "../scripts/platform.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const slash = (p) => p.replace(/\\/g, "/").toLowerCase(); // Windows paths ignore case
@@ -45,6 +45,32 @@ test("isMain is true only for the file that was run", () => {
   assert.equal(isMain(import.meta.url, fileURLToPath(import.meta.url)), true);
   assert.equal(isMain(import.meta.url, join(ROOT, "scripts", "deploy.mjs")), false);
   assert.equal(isMain(import.meta.url, ""), false);
+});
+
+test("repo paths are relative with forward slashes on both platforms", () => {
+  // theme check on Windows reports a lowercase drive letter; node's own root has it uppercase
+  assert.equal(repoPath("D:\\Work\\acme", "d:\\Work\\acme\\sections\\main.liquid", "win32"), "sections/main.liquid");
+  assert.equal(repoPath("/Users/dev/acme", "/Users/dev/acme/sections/main.liquid", "darwin"), "sections/main.liquid");
+  assert.equal(repoPath("/Users/dev/acme", "sections/main.liquid", "darwin"), "sections/main.liquid");
+  // a baseline a Windows deploy wrote before the fix still matches
+  assert.deepEqual(slashKeys({ "assets\\DIN-Bold.woff": "a1", "layout/theme.liquid": "b2" }), { "assets/DIN-Bold.woff": "a1", "layout/theme.liquid": "b2" });
+});
+
+// The kit files that key a baseline, a stamp or the kit version by path. A bare relative() there
+// gives backslashes on Windows, so the key differs between a Windows and a Mac machine.
+const PATH_KEYED = ["scripts/theme-sync.mjs", "scripts/deploy.mjs", "scripts/release.mjs", "scripts/approve.mjs", "scripts/review-stamp.mjs", "scripts/qa/run-all.mjs", "scripts/qa/carryover-walk.mjs", "hooks/kit-version.mjs"];
+
+test("every path a baseline, stamp or version is keyed by goes through slashes() or repoPath()", () => {
+  const problems = [];
+  for (const f of PATH_KEYED) {
+    if (!existsSync(join(ROOT, f))) continue; // brand repos have no hooks/
+    readFileSync(join(ROOT, f), "utf8").split("\n").forEach((line, i) => {
+      if (/^\s*\/\//.test(line)) return;
+      if (/(?<![\w.]|slashes\()relative\(/.test(line)) problems.push(`${f}:${i + 1}: wrap it in slashes() from scripts/platform.mjs: ${line.trim().slice(0, 90)}`);
+      if (/startsWith\(ROOT\)/.test(line)) problems.push(`${f}:${i + 1}: use repoPath(ROOT, p) from scripts/platform.mjs: ${line.trim().slice(0, 90)}`);
+    });
+  }
+  assert.deepEqual(problems, []);
 });
 
 test("no script starts a command or checks how it was run in a Mac-only way", () => {
