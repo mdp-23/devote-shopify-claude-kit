@@ -20,7 +20,8 @@
 //      and a "Code review: /code-review high" line in the PR body.
 //
 //   4. PUSH: git push must pass "npm run qa" first. A gate, not a block: pushing
-//      is Claude's to do, it just has to be green. Bypass: SKIP_QA=1.
+//      is Claude's to do, it just has to be green. Bypass: SKIP_QA=1, in front of the
+//      push (SKIP_QA=1 git push) or in the environment.
 //
 //   6. CHECKS HOLD: Claude never accepts its own screenshots (npm run visual -- --approve, or
 //      copying into design/visual-baseline/) and never writes .qa-pass.json, the record that
@@ -73,10 +74,49 @@ const MERGE = /(?:^|[;&|]\s*)gh\s+pr\s+merge\b/;
 // Only git's own options may sit between git and push (git -C dir push). Any other word is a
 // subcommand, so git stash push is a stash, not a push.
 const GIT_OPTIONS = String.raw`(?:(?:-C|-c|--git-dir|--work-tree|--namespace)\s+(?:"[^"]*"|'[^']*'|\S+)\s+|--?[A-Za-z][\w-]*(?:=\S+)?\s+)*`;
-// An environment prefix (GIT_SSH_COMMAND=... git push) is still a push.
-const PUSH = new RegExp(String.raw`(?:^|[;&|]\s*)(?:[A-Za-z_]\w*=(?:"[^"]*"|'[^']*'|\S*)\s+)*git\s+` + GIT_OPTIONS + String.raw`push\b`);
+// An environment prefix (GIT_SSH_COMMAND=... git push) is still a push. Group 1 is the prefix.
+const PUSH_STEP = new RegExp(String.raw`^\s*((?:[A-Za-z_]\w*=(?:"[^"]*"|'[^']*'|\S*)\s+)*)git\s+` + GIT_OPTIONS + String.raw`push\b`);
+
+/**
+ * Empty every quoted string: '...' and "..." become '' and "".
+ *
+ * Quoted text is an argument (a grep pattern, a commit message), so a "| git push" inside one is
+ * data, not a step (27 Nov 2026: a grep for that phrase was denied as a push). An unterminated
+ * quote keeps the rest of the command as it is, which fails toward blocking.
+ */
+export function withoutQuotedText(command) {
+  let out = "";
+  for (let i = 0; i < command.length; i++) {
+    const c = command[i];
+    if (c === "\\") { out += command.slice(i, i + 2); i++; continue; }
+    if (c !== "'" && c !== '"') { out += c; continue; }
+    let j = i + 1;
+    while (j < command.length && command[j] !== c) j += c === '"' && command[j] === "\\" ? 2 : 1;
+    if (j >= command.length) return out + command.slice(i);
+    out += c + c;
+    i = j;
+  }
+  return out;
+}
+
+// Quotes and heredoc bodies are dropped only when no shell is invoked: a shell runs what they hold.
+function pushSteps(command) {
+  const cmd = SHELL_INVOKED.test(command) ? command : withoutQuotedText(withoutHeredocBodies(command));
+  return steps(cmd).map((s) => s.match(PUSH_STEP)).filter(Boolean);
+}
+
 export function isGitPush(command) {
-  return PUSH.test(command);
+  return pushSteps(command).length > 0;
+}
+
+/**
+ * Whether every push in the command carries SKIP_QA=1 in front of it (SKIP_QA=1 git push), the
+ * bypass the deny message offers. Until 1.10.2 a prefixed push was not read as a push at all;
+ * once it was, the gate only looked at its own environment, which Claude cannot set.
+ */
+export function skipsQa(command) {
+  const pushes = pushSteps(command);
+  return pushes.length > 0 && pushes.every((m) => /(?:^|\s)SKIP_QA=1\s/.test(` ${m[1]}`));
 }
 
 // A shell in command position. If one is present, every character of the command
@@ -550,7 +590,7 @@ function main() {
 
   // Rule 4: pushes must be green
   if (!isGitPush(command)) allow();
-  if (process.env.SKIP_QA === "1") {
+  if (process.env.SKIP_QA === "1" || skipsQa(command)) {
     process.stdout.write(JSON.stringify({
       systemMessage: "Pre-push checks SKIPPED (SKIP_QA=1): pushing unchecked.",
     }));

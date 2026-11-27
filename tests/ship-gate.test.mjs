@@ -17,6 +17,7 @@ import {
   makesApproval,
   writesApprovalFile,
   isGitPush,
+  skipsQa,
   isLivePullOnly,
   themeFoldersDirty,
 } from "../scripts/qa/ship-gate.mjs";
@@ -70,6 +71,41 @@ test("rule 4: a git push is checked, a git stash push is not", () => {
   for (const cmd of ["git stash push -- snippets", "git stash push -m 'before Live Sync' -- sections", "git status", "shopify theme push --unpublished"]) {
     assert.equal(isGitPush(cmd), false, cmd);
   }
+});
+
+test("rule 4: a push named inside quotes or a heredoc is data, not a push", () => {
+  for (const cmd of [
+    'grep -rn "deny | git push" scripts',
+    "grep -E 'a|git push' notes.md",
+    'git commit -m "fix: gate; git push now waits for qa"',
+    'echo "then run: SKIP_QA=1 git push"',
+    "cat >> notes.md <<'EOF'\nthen: a && git push\nEOF",
+  ]) assert.equal(isGitPush(cmd), false, cmd);
+  for (const cmd of [
+    "npm test && git push",
+    "git status\ngit push origin main",
+    'git commit -m "a | b" && git push',
+    "echo $(git push)",
+    'bash -c "git status; git push"',
+    "cat <<'EOF' | bash\ngit push\nEOF",
+  ]) assert.equal(isGitPush(cmd), true, cmd);
+});
+
+test("rule 4: SKIP_QA=1 in front of every push skips the checks, as the deny message says", () => {
+  for (const cmd of [
+    "SKIP_QA=1 git push origin HEAD",
+    'cd "/Users/a/Client Themes/acme" && SKIP_QA=1 git push -u origin hotfix/x',
+    "GIT_SSH_COMMAND='ssh -i key' SKIP_QA=1 git push",
+  ]) assert.equal(skipsQa(cmd), true, cmd);
+  for (const cmd of [
+    "git push",
+    "SKIP_QA=0 git push",
+    "SKIP_QA=1 git fetch && git push",
+    "SKIP_QA=1 git push origin a && git push origin b",
+    "echo SKIP_QA=1 && git push",
+    "XSKIP_QA=1 git push",
+    "SKIP_QA=1 npm run qa",
+  ]) assert.equal(skipsQa(cmd), false, cmd);
 });
 
 const GREEN = [{ name: "theme-check", conclusion: "SUCCESS" }];
